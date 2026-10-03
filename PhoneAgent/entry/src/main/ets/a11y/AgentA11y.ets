@@ -26,6 +26,8 @@ import {
 } from '../common/Bridge';
 import { loadSettings } from '../common/Settings';
 import { DeviceExecutor } from './DeviceExecutor';
+import { SCRIPT_PREFIX, ScriptedLlm } from './ScriptedLlm';
+import BuildProfile from 'BuildProfile';
 
 const DOMAIN = 0x0A11;
 const TAG = 'AgentA11y';
@@ -139,18 +141,24 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
       this.addLog(LOG_ERROR, 'The task is empty.');
       return;
     }
-    const settings = loadSettings(this.context, true);
-    if (settings.apiKey.length === 0) {
-      this.addLog(LOG_ERROR, 'No Anthropic API key set. Enter it in Phone Agent first.');
-      return;
+    const task = req.task.trim();
+    let llm: Llm;
+    if (BuildProfile.DEBUG && task.startsWith(SCRIPT_PREFIX)) {
+      llm = new ScriptedLlm(task.substring(SCRIPT_PREFIX.length));
+    } else {
+      const settings = loadSettings(this.context, true);
+      if (settings.apiKey.length === 0) {
+        this.addLog(LOG_ERROR, 'No Anthropic API key set. Enter it in Phone Agent first.');
+        return;
+      }
+      llm = new ClaudeLlm(new AnthropicClient(settings.apiKey, findModel(req.model)));
     }
     this.entries = [];
     this.running = true;
-    const client = new AnthropicClient(settings.apiKey, findModel(req.model));
-    const loop = new AgentLoop(new ClaudeLlm(client), new DeviceExecutor(this.context), new StatusPublisher(this));
+    const loop = new AgentLoop(llm, new DeviceExecutor(this.context), new StatusPublisher(this));
     this.loop = loop;
     try {
-      await loop.run(req.task.trim());
+      await loop.run(task);
     } catch (e) {
       this.addLog(LOG_ERROR, `Unexpected failure: ${(e as Error).message}`);
     } finally {
