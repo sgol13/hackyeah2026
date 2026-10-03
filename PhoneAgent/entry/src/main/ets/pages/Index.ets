@@ -53,7 +53,10 @@ struct Index {
     subscribeEvents([EVT_STATUS], (event: string, data: string) => this.onStatus(data))
       .then((sub: commonEventManager.CommonEventSubscriber) => {
         this.subscriber = sub;
-        publishEvent(EVT_SYNC, '');
+        return publishEvent(EVT_SYNC, '');
+      })
+      .catch(() => {
+        this.notice = 'Could not connect to the agent service.';
       });
     this.enableService();
   }
@@ -223,7 +226,9 @@ struct Index {
           .backgroundColor('#757575')
           .enabled(this.running)
           .onClick(() => {
-            publishEvent(EVT_STOP, '');
+            publishEvent(EVT_STOP, '').catch(() => {
+              this.notice = 'Could not reach the agent service.';
+            });
           })
       }
       .width('100%')
