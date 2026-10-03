@@ -216,6 +216,13 @@ what is sent.
   through the *older* callbacks (`onConnect`, `onAccessibilityEvent`). The API 20 ones were not
   called, so the service never subscribed to commands. It now handles both callback sets, and the
   UI restarts the service (disable + enable) if a Run isn't acknowledged.
+* **Mirrored mouse in the emulator window**: Oniro's `run.sh` only gives the guest a relative PS/2
+  mouse, and under WSLg its movement arrived inverted on both axes. `scripts/qemu-with-tablet.sh`
+  (passed to `run.sh -q`) adds a `virtio-tablet-pci` absolute pointer; the guest kernel has
+  `virtio_input`.
+* **Run right after boot**: a RUN sent while the service was still connecting was lost. The UI now
+  pings the service (SYNC → STATUS) before sending, restarts it if it doesn't answer, and only then
+  starts the task.
 * **Signing from the IDE**: hvigor's `signingConfigs` only accepts passwords encrypted with a
   DevEco-specific local material folder, so our script-made system-app profile couldn't be used
   from the IDE. The format is readable in hvigor's own `decipher-util.js`. `scripts/ide-signing.js`

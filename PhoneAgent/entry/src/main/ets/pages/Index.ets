@@ -22,6 +22,11 @@ import { KEY_INCOMING_AUTORUN, KEY_INCOMING_TASK } from '../entryability/EntryAb
 const ERR_ALREADY_ENABLED = 9300002;
 const AUTORUN_DELAY_MS = 1500;
 const SERVICE_ACK_TIMEOUT_MS = 5000;
+const SERVICE_PING_TIMEOUT_MS = 8000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
 function modelIndexOf(id: string): number {
   const i = MODELS.findIndex((m: ModelOption) => m.id === id);
@@ -39,6 +44,8 @@ struct Index {
   @State notice: string = '';
   @State entries: LogEntry[] = [];
   private subscriber: commonEventManager.CommonEventSubscriber | undefined = undefined;
+  /** number of statuses received from the service (any status proves it is listening) */
+  private statusesSeen: number = 0;
   private statusInstance: number = 0;
   private statusVersion: number = 0;
 
@@ -100,6 +107,7 @@ struct Index {
     } catch (e) {
       return;
     }
+    this.statusesSeen++;
     if (status.instance === this.statusInstance && status.version <= this.statusVersion) {
       return; // stale or duplicate
     }
@@ -134,8 +142,20 @@ struct Index {
     const model = MODELS[this.modelIndex].id;
     await saveSettings(this.ctx(), { apiKey: this.apiKey, model: model });
     this.notice = '';
-    this.entries = [];
     this.running = true;
+    // Make sure the service is listening (e.g. right after boot it may still be connecting).
+    if (!(await this.waitForService(SERVICE_PING_TIMEOUT_MS))) {
+      this.notice = 'Starting the agent service…';
+      await this.restartService();
+      if (!(await this.waitForService(2 * SERVICE_PING_TIMEOUT_MS))) {
+        this.running = false;
+        this.notice = 'The agent service is not responding. Try again in a moment.';
+        return;
+      }
+      this.notice = '';
+    }
+    this.entries = [];
+    this.running = true; // the ping's status reply reset it
     const req: RunRequest = { task: task, model: model };
     const versionBefore = this.statusVersion;
     try {
@@ -155,12 +175,35 @@ struct Index {
     }, SERVICE_ACK_TIMEOUT_MS);
   }
 
+  /** Pings the service with SYNC until it answers with a status, or the timeout passes. */
+  private async waitForService(timeoutMs: number): Promise<boolean> {
+    const before = this.statusesSeen;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        await publishEvent(EVT_SYNC, '');
+      } catch (e) {
+        // keep trying until the deadline
+      }
+      for (let i = 0; i < 10 && Date.now() < deadline; i++) {
+        await sleep(100);
+        if (this.statusesSeen > before) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /** Reconnects a service process that is enabled but not listening (e.g. after it was killed). */
-  private restartService(): void {
+  private async restartService(): Promise<void> {
     this.serviceReady = false;
-    config.disableAbility(OWN_A11Y_ABILITY)
-      .catch(() => {})
-      .finally(() => this.enableService());
+    try {
+      await config.disableAbility(OWN_A11Y_ABILITY);
+    } catch (e) {
+      // not enabled: fine, enable below
+    }
+    this.enableService();
   }
 
   private entryColor(kind: string): ResourceColor {
