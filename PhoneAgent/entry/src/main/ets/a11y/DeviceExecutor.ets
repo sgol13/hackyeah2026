@@ -2,7 +2,7 @@ import { AccessibilityAction, AccessibilityElement, AccessibilityExtensionContex
 import { bundleManager, launcherBundleManager, Want } from '@kit.AbilityKit';
 import { process } from '@kit.ArkTS';
 import { Executor } from '../agent/AgentLoop';
-import { describeNode, serializeScreen, SerializedScreen } from '../agent/ScreenText';
+import { serializeScreen, SerializedScreen } from '../agent/ScreenText';
 import { OWN_BUNDLE } from '../common/Bridge';
 import {
   clickElement,
@@ -87,11 +87,10 @@ export class DeviceExecutor implements Executor {
   }
 
   describeElement(index: number): string {
-    if (this.snapshot === undefined || this.screen === undefined ||
-      index < 0 || index >= this.screen.indexMap.length) {
+    if (this.screen === undefined || index < 0 || index >= this.screen.lines.length) {
       return '';
     }
-    return describeNode(index, this.snapshot.nodes[this.screen.indexMap[index]]);
+    return this.screen.lines[index];
   }
 
   private rawIndex(index: number): number {

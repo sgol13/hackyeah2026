@@ -120,9 +120,9 @@ The prebuilt, signed `.hap` is attached to the GitHub release. Install it with
 ## Verifying it
 
 * **Tests on the emulator**: `.\scripts\test.ps1` builds the app and the hypium test HAP, signs
-  and installs both, and runs them with `aa test`. Expected result: `Tests run: 30, Failure: 0,
-  Error: 0, Pass: 30`. They cover the tool-call validator (bad model output), the screen
-  serializer, API error and response parsing, and the agent loop with a scripted fake model and
+  and installs both, and runs them with `aa test`. Expected result: `Tests run: 35, Failure: 0,
+  Error: 0, Pass: 35`. They cover the tool-call validator (bad model output), the screen
+  serializer (including folding row labels), API error and response parsing, and the agent loop with a scripted fake model and
   device (refusal, truncation, step limit, recovery, stop).
 * **System-app check**: `hdc shell "bm dump -n com.hackyeah.phoneagent" | findstr "appPrivilegeLevel isSystemApp"`
   shows `system_core` / `true`.

@@ -20,9 +20,10 @@ function str(v: string | undefined): string {
   return v ?? '';
 }
 
-function toNode(el: AccessibilityElement): UiNode {
+function toNode(el: AccessibilityElement, depth: number): UiNode {
   const r = el.rect;
   return {
+    depth: depth,
     type: str(el.componentType),
     text: str(el.text),
     desc: str(el.accessibilityText).length > 0 ? str(el.accessibilityText) : str(el.description),
@@ -45,7 +46,7 @@ async function walk(el: AccessibilityElement, depth: number, snap: ScreenSnapsho
   if (snap.nodes.length >= MAX_RAW_NODES || depth > MAX_DEPTH) {
     return;
   }
-  snap.nodes.push(toNode(el));
+  snap.nodes.push(toNode(el, depth));
   snap.elements.push(el);
   let children: AccessibilityElement[] = [];
   try {

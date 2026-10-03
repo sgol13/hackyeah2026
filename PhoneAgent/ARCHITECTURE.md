@@ -125,7 +125,7 @@ sequenceDiagram
 | Non-JSON or malformed response | A typed `invalid_response` error. |
 | Service not connected yet | The UI's ack timeout resets the Run button. |
 
-All of these paths are covered by the instrumented tests in `entry/src/ohosTest` (30 tests,
+All of these paths are covered by the instrumented tests in `entry/src/ohosTest` (35 tests,
 run on the emulator with `scripts/test.ps1`).
 
 ## Platform capabilities used

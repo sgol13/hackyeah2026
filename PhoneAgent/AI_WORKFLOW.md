@@ -93,7 +93,7 @@ what is sent.
 
 ### Validation approach
 
-* **Unit and integration tests on the device** (`entry/src/ohosTest`, 30 hypium tests, run with
+* **Unit and integration tests on the device** (`entry/src/ohosTest`, 35 hypium tests, run with
   `scripts/test.ps1`):
   * the tool-call validator against malformed model output (unknown tool, wrong types, out-of-range
     or non-integer index, bad enum, oversized text, missing input);
@@ -104,7 +104,7 @@ what is sent.
     message, `is_error` round trips, recovery with the current screen, refusal, `max_tokens`, the
     nudge, the step limit, user stop, and thinking blocks echoed back unchanged.
   * To check that the async tests are really awaited, an assertion was deliberately made wrong; the
-    run failed (29/30) and the change was reverted.
+    run failed (34/35) and the change was reverted.
 * **On-device spikes** before building on each assumption, using hilog and screenshots:
   * system signing: `appPrivilegeLevel: system_core`;
   * `launcherBundleManager` returns 12 apps;

@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@ohos/hypium';
 import { describeNode, isInteresting, serializeScreen, UiNode } from '../../../main/ets/agent/ScreenText';
 
-function node(type: string, text: string): UiNode {
+function node(type: string, text: string, depth: number = 0): UiNode {
   return {
-    type: type, text: text, desc: '', hint: '',
+    depth: depth, type: type, text: text, desc: '', hint: '',
     clickable: false, editable: false, scrollable: false, checkable: false, checked: false, focused: false,
     visible: true, left: 0, top: 100, width: 100, height: 40
   };
@@ -71,6 +71,49 @@ export default function screenTextTest() {
       const line = describeNode(0, n);
       expect(line.indexOf('\n')).assertEqual(-1);
       expect(line).assertContain('…');
+    });
+
+    it('folds the texts of a tappable row into the row', 0, () => {
+      const row = node('Flex', '', 1);
+      row.clickable = true;
+      const s = serializeScreen([node('Column', '', 0), row, node('Text', 'WLAN', 2), node('Text', 'Off', 2)], 10);
+      expect(s.indexMap.length).assertEqual(1);
+      expect(s.indexMap[0]).assertEqual(1);
+      expect(s.lines[0]).assertContain('[0] Flex "WLAN · Off" (click)');
+    });
+
+    it('keeps nested controls separate and folds only plain texts', 0, () => {
+      const row = node('Flex', '', 1);
+      row.clickable = true;
+      const toggle = node('Toggle', '', 2);
+      toggle.checkable = true;
+      const s = serializeScreen([row, node('Text', 'Bluetooth', 2), toggle], 10);
+      expect(s.lines.length).assertEqual(2);
+      expect(s.lines[0]).assertContain('"Bluetooth"');
+      expect(s.lines[1]).assertContain('Toggle (unchecked)');
+    });
+
+    it('drops a child text that repeats its button label', 0, () => {
+      const button = node('Button', 'Send', 0);
+      button.clickable = true;
+      const s = serializeScreen([button, node('Text', 'Send', 1)], 10);
+      expect(s.lines.length).assertEqual(1);
+    });
+
+    it('does not fold list items into a scrollable list', 0, () => {
+      const list = node('List', '', 0);
+      list.scrollable = true;
+      const s = serializeScreen([list, node('Text', 'a', 1), node('Text', 'b', 1)], 10);
+      expect(s.lines.length).assertEqual(3);
+    });
+
+    it('stops folding at the end of the subtree', 0, () => {
+      const row = node('Flex', '', 1);
+      row.clickable = true;
+      const s = serializeScreen([row, node('Text', 'inside', 2), node('Text', 'outside', 1)], 10);
+      expect(s.lines.length).assertEqual(2);
+      expect(s.lines[0]).assertContain('"inside"');
+      expect(s.lines[1]).assertContain('"outside"');
     });
 
     it('reports an empty screen explicitly', 0, () => {

@@ -43,7 +43,9 @@ if ($installOut -notmatch 'install bundle successfully') { throw 'hdc install fa
 
 $bundle = [regex]::Match((Get-Content (Join-Path $root 'AppScope\app.json5') -Raw), '"bundleName"\s*:\s*"([^"]+)"').Groups[1].Value
 $out = (& $hdc -t $Target shell "aa test -b $bundle -m entry_test -s unittest OpenHarmonyTestRunner -s timeout 30000") -join "`n"
-Write-Host $out
+# print failing test details (non-empty stream=) and the summary only
+$out -split "`n" | Where-Object { $_ -match 'stream=\S|OHOS_REPORT_STATUS: test=|OHOS_REPORT_STATUS_CODE: -' } |
+    Where-Object { $_ -notmatch 'OHOS_REPORT_STATUS: test=' -or $_ -match 'stream=\S' } | ForEach-Object { Write-Host $_ }
 $summary = [regex]::Match($out, 'Tests run: (\d+), Failure: (\d+), Error: (\d+), Pass: (\d+)')
 if (-not $summary.Success) { throw 'no test summary found in aa test output' }
 if ([int]$summary.Groups[2].Value -gt 0 -or [int]$summary.Groups[3].Value -gt 0) { throw "tests failed: $($summary.Value)" }
