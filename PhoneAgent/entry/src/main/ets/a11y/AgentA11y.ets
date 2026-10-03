@@ -3,7 +3,7 @@
  * Runs in its own process and stays connected while other apps are in the
  * foreground, which is where the agent has to read and operate the UI.
  */
-import { AccessibilityEventInfo, AccessibilityExtensionAbility } from '@kit.AccessibilityKit';
+import { AccessibilityEvent, AccessibilityEventInfo, AccessibilityExtensionAbility } from '@kit.AccessibilityKit';
 import { Want } from '@kit.AbilityKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -60,6 +60,7 @@ class StatusPublisher implements AgentListener {
 
 export default class AgentA11y extends AccessibilityExtensionAbility {
   private subscriber: commonEventManager.CommonEventSubscriber | undefined = undefined;
+  private subscribing: boolean = false;
   private loop: AgentLoop | undefined = undefined;
   private running: boolean = false;
   private entries: LogEntry[] = [];
@@ -69,26 +70,55 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
   /** statuses are published one after another so the UI receives them in order */
   private publishQueue: Promise<void> = Promise.resolve();
 
+  // The framework calls either the API 20 callbacks (onAccessibilityConnect...) or, e.g. when it
+  // restarts the service process, the older ones (onConnect...). Both lead to the same idempotent setup.
   onAccessibilityConnect(): void {
-    hilog.info(DOMAIN, TAG, 'service connected');
+    this.connect('onAccessibilityConnect');
+  }
+
+  onConnect(): void {
+    this.connect('onConnect');
+  }
+
+  onAccessibilityDisconnect(): void {
+    this.disconnect();
+  }
+
+  onDisconnect(): void {
+    this.disconnect();
+  }
+
+  onAccessibilityEventInfo(event: AccessibilityEventInfo): void {
+    // The agent reads the UI on demand; individual events are not needed.
+  }
+
+  onAccessibilityEvent(event: AccessibilityEvent): void {
+    // same as above, for the older callback set
+  }
+
+  private connect(via: string): void {
+    hilog.info(DOMAIN, TAG, 'service connected (%{public}s)', via);
+    if (this.subscriber !== undefined || this.subscribing) {
+      return;
+    }
+    this.subscribing = true;
     subscribeEvents([EVT_RUN, EVT_STOP, EVT_SYNC], (event: string, data: string) => this.onEvent(event, data))
       .then((sub: commonEventManager.CommonEventSubscriber) => {
         this.subscriber = sub;
       })
       .catch((err: Error) => {
         hilog.error(DOMAIN, TAG, 'subscribe failed: %{public}s', err.message);
+      })
+      .finally(() => {
+        this.subscribing = false;
       });
   }
 
-  onAccessibilityDisconnect(): void {
+  private disconnect(): void {
     hilog.info(DOMAIN, TAG, 'service disconnected');
     this.loop?.stop();
     unsubscribeEvents(this.subscriber);
     this.subscriber = undefined;
-  }
-
-  onAccessibilityEventInfo(event: AccessibilityEventInfo): void {
-    // The agent reads the UI on demand; individual events are not needed.
   }
 
   addLog(kind: string, text: string): void {

@@ -149,9 +149,18 @@ struct Index {
     setTimeout(() => {
       if (this.running && this.statusVersion === versionBefore) {
         this.running = false;
-        this.notice = 'The agent service did not respond. Wait a moment and tap Run again.';
+        this.notice = 'The agent service did not respond. It is being restarted, tap Run again in a moment.';
+        this.restartService();
       }
     }, SERVICE_ACK_TIMEOUT_MS);
+  }
+
+  /** Reconnects a service process that is enabled but not listening (e.g. after it was killed). */
+  private restartService(): void {
+    this.serviceReady = false;
+    config.disableAbility(OWN_A11Y_ABILITY)
+      .catch(() => {})
+      .finally(() => this.enableService());
   }
 
   private entryColor(kind: string): ResourceColor {
