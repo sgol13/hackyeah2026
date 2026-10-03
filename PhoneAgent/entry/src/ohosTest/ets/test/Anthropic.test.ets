@@ -1,11 +1,11 @@
 import { describe, expect, it } from '@ohos/hypium';
 import {
   AnthropicClient,
-  AnthropicError,
   findModel,
   parseApiError,
   parseMessagesResponse
 } from '../../../main/ets/agent/Anthropic';
+import { LlmError } from '../../../main/ets/agent/Http';
 
 export default function anthropicTest() {
   describe('Anthropic client helpers', () => {
@@ -41,14 +41,14 @@ export default function anthropicTest() {
       try {
         parseMessagesResponse('{"content": [');
       } catch (e) {
-        notJson = e instanceof AnthropicError && (e as AnthropicError).errorType === 'invalid_response';
+        notJson = e instanceof LlmError && (e as LlmError).errorType === 'invalid_response';
       }
       expect(notJson).assertTrue();
       let missing = false;
       try {
         parseMessagesResponse('{"id":"msg_1"}');
       } catch (e) {
-        missing = e instanceof AnthropicError;
+        missing = e instanceof LlmError;
       }
       expect(missing).assertTrue();
     });
@@ -61,7 +61,11 @@ export default function anthropicTest() {
       const haiku = new AnthropicClient('k', findModel('claude-haiku-4-5')).buildRequest('sys', [], []);
       expect(haiku.output_config).assertUndefined();
       expect(haiku.fallbacks).assertUndefined();
-      expect(findModel('not-a-model').id).assertEqual('claude-opus-5-5');
+      // custom model IDs are sent as-is, without Opus/Sonnet-only options
+      const custom = new AnthropicClient('k', findModel('claude-future-9')).buildRequest('sys', [], []);
+      expect(custom.model).assertEqual('claude-future-9');
+      expect(custom.output_config).assertUndefined();
+      expect(custom.fallbacks).assertUndefined();
     });
   });
 }

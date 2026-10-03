@@ -7,10 +7,8 @@ import { AccessibilityEvent, AccessibilityEventInfo, AccessibilityExtensionAbili
 import { Want } from '@kit.AbilityKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { AnthropicClient, ApiMessage, findModel, MessagesResponse } from '../agent/Anthropic';
 import { AgentListener, AgentLoop, Llm, LOG_ERROR } from '../agent/AgentLoop';
-import { SYSTEM_PROMPT } from '../agent/Prompt';
-import { TOOLS } from '../agent/Tools';
+import { createLlm, findProvider } from '../agent/Providers';
 import {
   AgentStatus,
   EVT_RUN,
@@ -24,7 +22,7 @@ import {
   subscribeEvents,
   unsubscribeEvents
 } from '../common/Bridge';
-import { loadSettings } from '../common/Settings';
+import { loadApiKey } from '../common/Settings';
 import { DeviceExecutor } from './DeviceExecutor';
 import { SCRIPT_PREFIX, ScriptedLlm } from './ScriptedLlm';
 import BuildProfile from 'BuildProfile';
@@ -33,18 +31,6 @@ const DOMAIN = 0x0A11;
 const TAG = 'AgentA11y';
 const MAX_LOG_TEXT = 600;
 const RETURN_TO_UI_DELAY_MS = 3000;
-
-class ClaudeLlm implements Llm {
-  private client: AnthropicClient;
-
-  constructor(client: AnthropicClient) {
-    this.client = client;
-  }
-
-  send(messages: ApiMessage[]): Promise<MessagesResponse> {
-    return this.client.createMessage(this.client.buildRequest(SYSTEM_PROMPT, TOOLS, messages));
-  }
-}
 
 class StatusPublisher implements AgentListener {
   private owner: AgentA11y;
@@ -176,12 +162,22 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
     if (BuildProfile.DEBUG && task.startsWith(SCRIPT_PREFIX)) {
       llm = new ScriptedLlm(task.substring(SCRIPT_PREFIX.length));
     } else {
-      const settings = loadSettings(this.context, true);
-      if (settings.apiKey.length === 0) {
-        this.addLog(LOG_ERROR, 'No Anthropic API key set. Enter it in Phone Agent first.');
+      const provider = findProvider(req.provider);
+      if (provider === undefined) {
+        this.addLog(LOG_ERROR, `Unknown AI provider "${req.provider}".`);
         return;
       }
-      llm = new ClaudeLlm(new AnthropicClient(settings.apiKey, findModel(req.model)));
+      const apiKey = loadApiKey(this.context, provider.id, true);
+      if (apiKey.length === 0) {
+        this.addLog(LOG_ERROR, `No ${provider.label} API key set. Enter it in Phone Agent first.`);
+        return;
+      }
+      try {
+        llm = createLlm(provider.id, apiKey, typeof req.model === 'string' ? req.model.trim() : '');
+      } catch (e) {
+        this.addLog(LOG_ERROR, (e as Error).message);
+        return;
+      }
     }
     this.entries = [];
     this.running = true;

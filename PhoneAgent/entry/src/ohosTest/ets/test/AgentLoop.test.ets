@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@ohos/hypium';
-import { AnthropicError, ApiMessage, ContentBlock, MessagesResponse } from '../../../main/ets/agent/Anthropic';
+import { ApiMessage, ContentBlock, MessagesResponse } from '../../../main/ets/agent/Anthropic';
+import { LlmError } from '../../../main/ets/agent/Http';
 import { AgentListener, AgentLoop, Executor, Llm, LOG_ERROR } from '../../../main/ets/agent/AgentLoop';
 
 // ---------- fakes ----------
@@ -7,7 +8,7 @@ import { AgentListener, AgentLoop, Executor, Llm, LOG_ERROR } from '../../../mai
 /** Replays scripted responses and records every request it receives. */
 class FakeLlm implements Llm {
   responses: MessagesResponse[] = [];
-  error: AnthropicError | undefined = undefined;
+  error: LlmError | undefined = undefined;
   requests: string[] = [];
 
   send(messages: ApiMessage[]): Promise<MessagesResponse> {
@@ -203,7 +204,7 @@ export default function agentLoopTest() {
 
     it('turns API errors into a readable message', 0, async () => {
       const s = setup();
-      s[0].error = new AnthropicError(401, 'authentication_error', 'invalid x-api-key', false);
+      s[0].error = new LlmError(401, 'authentication_error', 'invalid x-api-key', false);
       const result = await s[3].run('task');
       expect(result.success).assertFalse();
       expect(result.summary).assertContain('API key was rejected');

@@ -1,8 +1,8 @@
 import { config } from '@kit.AccessibilityKit';
 import { common } from '@kit.AbilityKit';
 import { BusinessError, commonEventManager } from '@kit.BasicServicesKit';
-import { MODELS, ModelOption } from '../agent/Anthropic';
 import { LOG_ACTION, LOG_DONE, LOG_ERROR, LOG_TASK } from '../agent/AgentLoop';
+import { isValidModelId, ModelChoice, ProviderInfo, PROVIDERS } from '../agent/Providers';
 import {
   AgentStatus,
   EVT_RUN,
@@ -16,7 +16,7 @@ import {
   subscribeEvents,
   unsubscribeEvents
 } from '../common/Bridge';
-import { loadSettings, saveSettings } from '../common/Settings';
+import { loadApiKey, loadSettings, saveApiKey, saveSettings } from '../common/Settings';
 import { KEY_INCOMING_AUTORUN, KEY_INCOMING_TASK } from '../entryability/EntryAbility';
 
 const ERR_ALREADY_ENABLED = 9300002;
@@ -28,16 +28,31 @@ function sleep(ms: number): Promise<void> {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-function modelIndexOf(id: string): number {
-  const i = MODELS.findIndex((m: ModelOption) => m.id === id);
+const CUSTOM_MODEL_LABEL = 'Custom model ID…';
+
+function providerIndexOf(id: string): number {
+  const i = PROVIDERS.findIndex((p: ProviderInfo) => p.id === id);
   return i >= 0 ? i : 0;
+}
+
+function modelOptions(p: ProviderInfo): SelectOption[] {
+  const options = p.models.map((m: ModelChoice) => {
+    const o: SelectOption = { value: m.label };
+    return o;
+  });
+  const custom: SelectOption = { value: CUSTOM_MODEL_LABEL };
+  options.push(custom);
+  return options;
 }
 
 @Entry
 @Component
 struct Index {
+  @State providerIndex: number = 0;
   @State apiKey: string = '';
+  /** index into the provider's models; models.length = custom model ID */
   @State modelIndex: number = 0;
+  @State customModel: string = '';
   @State task: string = '';
   @State running: boolean = false;
   @State serviceReady: boolean = false;
@@ -55,8 +70,16 @@ struct Index {
 
   aboutToAppear(): void {
     const settings = loadSettings(this.ctx(), false);
+    this.providerIndex = providerIndexOf(settings.provider);
     this.apiKey = settings.apiKey;
-    this.modelIndex = modelIndexOf(settings.model);
+    const models = PROVIDERS[this.providerIndex].models;
+    const i = models.findIndex((m: ModelChoice) => m.id === settings.model);
+    if (i >= 0) {
+      this.modelIndex = i;
+    } else {
+      this.modelIndex = models.length;
+      this.customModel = settings.model;
+    }
     subscribeEvents([EVT_STATUS], (event: string, data: string) => this.onStatus(data))
       .then((sub: commonEventManager.CommonEventSubscriber) => {
         this.subscriber = sub;
@@ -129,18 +152,47 @@ struct Index {
     }
   }
 
+  private provider(): ProviderInfo {
+    return PROVIDERS[this.providerIndex];
+  }
+
+  private isCustomModel(): boolean {
+    return this.modelIndex >= this.provider().models.length;
+  }
+
+  private selectedModel(): string {
+    return this.isCustomModel() ? this.customModel.trim() : this.provider().models[this.modelIndex].id;
+  }
+
+  /** Keeps each provider's key: save the one being left, load the one being switched to. */
+  private async switchProvider(index: number): Promise<void> {
+    if (index === this.providerIndex) {
+      return;
+    }
+    await saveApiKey(this.ctx(), this.provider().id, this.apiKey);
+    this.providerIndex = index;
+    this.apiKey = loadApiKey(this.ctx(), this.provider().id, false);
+    this.modelIndex = 0;
+    this.customModel = '';
+  }
+
   private async run(): Promise<void> {
     const task = this.task.trim();
+    const provider = this.provider();
     if (this.apiKey.trim().length === 0) {
-      this.notice = 'Enter your Anthropic API key first.';
+      this.notice = `Enter your ${provider.label} API key first.`;
+      return;
+    }
+    const model = this.selectedModel();
+    if (!isValidModelId(model)) {
+      this.notice = 'Enter a valid model ID (letters, digits, . _ - : /).';
       return;
     }
     if (task.length === 0) {
       this.notice = 'Describe what the agent should do.';
       return;
     }
-    const model = MODELS[this.modelIndex].id;
-    await saveSettings(this.ctx(), { apiKey: this.apiKey, model: model });
+    await saveSettings(this.ctx(), { provider: provider.id, model: model, apiKey: this.apiKey });
     this.notice = '';
     this.running = true;
     // Make sure the service is listening (e.g. right after boot it may still be connecting).
@@ -156,7 +208,7 @@ struct Index {
     }
     this.entries = [];
     this.running = true; // the ping's status reply reset it
-    const req: RunRequest = { task: task, model: model };
+    const req: RunRequest = { task: task, provider: provider.id, model: model };
     const versionBefore = this.statusVersion;
     try {
       await publishEvent(EVT_RUN, JSON.stringify(req));
@@ -246,21 +298,34 @@ struct Index {
         .fontColor(this.serviceReady ? '#2E7D32' : '#C62828')
         .width('100%')
         .onClick(() => this.enableService())
-      TextInput({ placeholder: 'Anthropic API key (sk-ant-...)', text: this.apiKey })
+      Select(PROVIDERS.map((p: ProviderInfo) => {
+        const o: SelectOption = { value: p.label };
+        return o;
+      }))
+        .selected(this.providerIndex)
+        .value(this.provider().label)
+        .width('100%')
+        .onSelect((index: number) => {
+          this.switchProvider(index);
+        })
+      TextInput({ placeholder: this.provider().keyHint, text: this.apiKey })
         .type(InputType.Password)
         .onChange((v: string) => {
           this.apiKey = v;
         })
-      Select(MODELS.map((m: ModelOption) => {
-        const o: SelectOption = { value: m.label };
-        return o;
-      }))
+      Select(modelOptions(this.provider()))
         .selected(this.modelIndex)
-        .value(MODELS[this.modelIndex].label)
+        .value(this.isCustomModel() ? CUSTOM_MODEL_LABEL : this.provider().models[this.modelIndex].label)
         .width('100%')
         .onSelect((index: number) => {
           this.modelIndex = index;
         })
+      if (this.isCustomModel()) {
+        TextInput({ placeholder: 'Model ID, e.g. gpt-5.1', text: this.customModel })
+          .onChange((v: string) => {
+            this.customModel = v;
+          })
+      }
       TextArea({ placeholder: 'What should I do? e.g. "Text grandma that I will come to her birthday"', text: this.task })
         .height(90)
         .onChange((v: string) => {

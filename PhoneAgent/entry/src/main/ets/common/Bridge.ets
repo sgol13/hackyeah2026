@@ -21,6 +21,8 @@ export const EVT_STATUS = 'com.hackyeah.phoneagent.STATUS';
 
 export interface RunRequest {
   task: string;
+  /** provider id, see agent/Providers.ets */
+  provider: string;
   model: string;
 }
 

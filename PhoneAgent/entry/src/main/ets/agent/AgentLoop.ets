@@ -7,7 +7,8 @@
  * The message history is append-only (required for thinking blocks and keeps
  * the prompt cache warm).
  */
-import { AnthropicError, ApiMessage, ContentBlock, MessagesResponse } from './Anthropic';
+import { ApiMessage, ContentBlock, MessagesResponse } from './Anthropic';
+import { LlmError } from './Http';
 import {
   parseToolCall,
   TOOL_CLICK,
@@ -73,8 +74,8 @@ function toolResult(toolUseId: string, content: string, isError: boolean): Conte
   return block;
 }
 
-/** User-facing description of an API failure. */
-export function describeApiError(e: AnthropicError): string {
+/** User-facing description of an API failure (any provider). */
+export function describeApiError(e: LlmError): string {
   switch (e.errorType) {
     case 'authentication_error':
       return 'The API key was rejected. Check it in the settings.';
@@ -82,11 +83,13 @@ export function describeApiError(e: AnthropicError): string {
     case 'not_found_error':
       return `The selected model is not available for this API key (${e.message}).`;
     case 'rate_limit_error':
-      return 'Rate limited by the Anthropic API. Try again in a minute.';
+      return 'Rate limited by the AI provider. Try again in a minute.';
     case 'overloaded_error':
-      return 'The Anthropic API is overloaded. Try again shortly.';
+      return 'The AI provider is overloaded. Try again shortly.';
+    case 'billing_error':
+      return `The AI provider account has no credit or quota left (${e.message}).`;
     case 'network_error':
-      return `Cannot reach api.anthropic.com. Check the internet connection. (${e.message})`;
+      return `Cannot reach the AI provider. Check the internet connection. (${e.message})`;
     case 'invalid_response':
       return `Unexpected response from the API: ${e.message}`;
     default:
@@ -148,7 +151,7 @@ export class AgentLoop {
       try {
         resp = await this.llm.send(messages);
       } catch (e) {
-        const msg = e instanceof AnthropicError ? describeApiError(e as AnthropicError) : errorMessage(e as Object);
+        const msg = e instanceof LlmError ? describeApiError(e as LlmError) : errorMessage(e as Object);
         return this.end(false, msg, step - 1);
       }
       // Append the full content (incl. thinking/fallback blocks) unchanged.

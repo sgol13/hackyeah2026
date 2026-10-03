@@ -1,20 +1,20 @@
 /**
  * Minimal hand-written client for the Anthropic Messages API (POST /v1/messages).
- * There is no Anthropic SDK for ArkTS, so this speaks raw HTTP via @kit.NetworkKit.
+ * There is no Anthropic SDK for ArkTS, so this speaks raw HTTP (see Http.ets).
  * Non-streaming; retries 429 / 5xx / 529 / network errors with backoff.
+ *
+ * The Messages API content blocks (text / tool_use / tool_result) are also the
+ * provider-neutral conversation format of the agent loop; the OpenAI-compatible
+ * and Gemini clients translate to and from it.
  */
-import { http } from '@kit.NetworkKit';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { HttpResponse, isRetryableStatus, LlmError, postWithRetry } from './Http';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 // fallbacks: "default" re-runs a safety-declined request on Anthropic's recommended model.
 const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
-const MAX_RETRIES = 3;
-const CONNECT_TIMEOUT_MS = 30000;
-const READ_TIMEOUT_MS = 180000;
 
-// ---------- wire types ----------
+// ---------- wire types (also the agent's conversation format) ----------
 
 export interface ContentBlock {
   type: string;
@@ -27,6 +27,8 @@ export interface ContentBlock {
   is_error?: boolean;
   thinking?: string;
   signature?: string;
+  /** Gemini only: thought signature to send back with this part (never set for Anthropic) */
+  thought_signature?: string;
 }
 
 export interface ApiMessage {
@@ -92,6 +94,11 @@ export interface MessagesResponse {
   usage?: Usage;
 }
 
+/** A provider client that takes the agent's conversation format (OpenAI-compatible, Gemini). */
+export interface ChatClient {
+  createMessage(system: string, tools: ToolDef[], messages: ApiMessage[]): Promise<MessagesResponse>;
+}
+
 interface ApiErrorDetail {
   type: string;
   message: string;
@@ -107,45 +114,32 @@ interface ApiErrorBody {
 export interface ModelOption {
   id: string;
   label: string;
-  /** output_config.effort; undefined = model does not take effort (Haiku 4.5) */
+  /** output_config.effort; undefined = model does not take effort (Haiku 4.5, unknown models) */
   effort?: string;
   /** whether fallbacks:"default" is supported */
   fallbacks: boolean;
 }
 
-export const MODELS: ModelOption[] = [
+export const ANTHROPIC_MODELS: ModelOption[] = [
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', effort: 'medium', fallbacks: true },
   { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', effort: 'medium', fallbacks: true },
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', fallbacks: false }
 ];
 
+/** Known model -> its options; any other (custom) model ID is sent as-is with no extra options. */
 export function findModel(id: string): ModelOption {
-  for (const m of MODELS) {
+  for (const m of ANTHROPIC_MODELS) {
     if (m.id === id) {
       return m;
     }
   }
-  return MODELS[0];
+  return { id: id, label: id, fallbacks: false };
 }
 
-// ---------- errors ----------
+// ---------- responses ----------
 
-export class AnthropicError extends Error {
-  status: number;
-  errorType: string;
-  retryable: boolean;
-
-  constructor(status: number, errorType: string, message: string, retryable: boolean) {
-    super(message);
-    this.name = 'AnthropicError';
-    this.status = status;
-    this.errorType = errorType;
-    this.retryable = retryable;
-  }
-}
-
-/** Turns a non-2xx HTTP response into an AnthropicError (exported for tests). */
-export function parseApiError(status: number, body: string): AnthropicError {
+/** Turns a non-2xx HTTP response into an LlmError (exported for tests). */
+export function parseApiError(status: number, body: string): LlmError {
   let errorType = 'http_error';
   let message = `HTTP ${status}`;
   try {
@@ -159,8 +153,7 @@ export function parseApiError(status: number, body: string): AnthropicError {
       message = `HTTP ${status}: ${body.substring(0, 200)}`;
     }
   }
-  const retryable = status === 429 || status >= 500;
-  return new AnthropicError(status, errorType, message, retryable);
+  return new LlmError(status, errorType, message, isRetryableStatus(status));
 }
 
 /** Parses and sanity-checks a 200 response body (exported for tests). */
@@ -169,26 +162,19 @@ export function parseMessagesResponse(body: string): MessagesResponse {
   try {
     parsed = JSON.parse(body) as MessagesResponse;
   } catch (e) {
-    throw new AnthropicError(200, 'invalid_response', 'Response is not valid JSON', true);
+    throw new LlmError(200, 'invalid_response', 'Response is not valid JSON', true);
   }
   if (!parsed || !Array.isArray(parsed.content) || typeof parsed.stop_reason !== 'string') {
-    throw new AnthropicError(200, 'invalid_response', 'Response is missing content/stop_reason', true);
+    throw new LlmError(200, 'invalid_response', 'Response is missing content/stop_reason', true);
   }
   return parsed;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-function retryDelayMs(attempt: number, retryAfterHeader: string | undefined): number {
-  if (retryAfterHeader) {
-    const seconds = parseFloat(retryAfterHeader);
-    if (!isNaN(seconds) && seconds >= 0) {
-      return Math.min(seconds * 1000, 60000);
-    }
+function handleResponse(resp: HttpResponse): MessagesResponse {
+  if (resp.status >= 200 && resp.status < 300) {
+    return parseMessagesResponse(resp.body);
   }
-  return Math.min(1000 * Math.pow(2, attempt), 16000);
+  throw parseApiError(resp.status, resp.body);
 }
 
 // ---------- client ----------
@@ -196,8 +182,6 @@ function retryDelayMs(attempt: number, retryAfterHeader: string | undefined): nu
 export class AnthropicClient {
   private apiKey: string;
   private model: ModelOption;
-  /** retry-after header of the last failed response, if any */
-  private lastRetryAfter: string | undefined = undefined;
 
   constructor(apiKey: string, model: ModelOption) {
     this.apiKey = apiKey;
@@ -224,33 +208,7 @@ export class AnthropicClient {
     return req;
   }
 
-  async createMessage(req: MessagesRequest): Promise<MessagesResponse> {
-    const body = JSON.stringify(req);
-    let lastError: AnthropicError = new AnthropicError(0, 'unknown', 'request not sent', true);
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      let retryAfter: string | undefined = undefined;
-      try {
-        return await this.postOnce(body);
-      } catch (e) {
-        if (e instanceof AnthropicError) {
-          lastError = e;
-          retryAfter = this.lastRetryAfter;
-        } else {
-          const err = e as BusinessError;
-          // network-level failure (DNS, connect, timeout): retryable
-          lastError = new AnthropicError(0, 'network_error', `Network error ${err.code}: ${err.message}`, true);
-        }
-      }
-      if (!lastError.retryable || attempt === MAX_RETRIES) {
-        break;
-      }
-      await sleep(retryDelayMs(attempt, retryAfter));
-    }
-    throw lastError;
-  }
-
-  private async postOnce(body: string): Promise<MessagesResponse> {
-    this.lastRetryAfter = undefined;
+  createMessage(req: MessagesRequest): Promise<MessagesResponse> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       'x-api-key': this.apiKey,
@@ -259,25 +217,6 @@ export class AnthropicClient {
     if (this.model.fallbacks) {
       headers['anthropic-beta'] = FALLBACK_BETA;
     }
-    const request = http.createHttp();
-    try {
-      const resp = await request.request(API_URL, {
-        method: http.RequestMethod.POST,
-        header: headers,
-        extraData: body,
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: CONNECT_TIMEOUT_MS,
-        readTimeout: READ_TIMEOUT_MS
-      });
-      const text = typeof resp.result === 'string' ? resp.result as string : '';
-      if (resp.responseCode >= 200 && resp.responseCode < 300) {
-        return parseMessagesResponse(text);
-      }
-      const respHeaders = resp.header as Record<string, string>;
-      this.lastRetryAfter = respHeaders ? respHeaders['retry-after'] : undefined;
-      throw parseApiError(resp.responseCode, text);
-    } finally {
-      request.destroy();
-    }
+    return postWithRetry<MessagesResponse>(API_URL, headers, JSON.stringify(req), handleResponse);
   }
 }
