@@ -160,6 +160,8 @@ in the UI.
 
 * The emulator has no SIM card, so Messages won't actually send (`canSendMessage=false` in its
   log). The agent fills in and presses Send, and the demo explains this.
+* WebView-based editors (for example the Notes app's note body) don't accept accessibility
+  `SET_TEXT`. The agent gets an error and works around it, for example with a shorter title.
 * Icon-only buttons with no accessibility label are shown to the model as `Image (click) @x,y`.
   It infers them from position and context, which usually works, but not always.
 * The agent is fully autonomous (a design decision for the challenge): there is no confirmation

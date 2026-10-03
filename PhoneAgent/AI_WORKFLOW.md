@@ -90,6 +90,8 @@ what is sent.
   tool set is narrow, and nothing outside the UI is reachable. Ruling it out completely is not
   possible.
 * The emulator has no SIM card, so SMS sending ends at the Messages app's `canSendMessage=false`.
+* Text editors built on WebView (for example the Notes app's note body) don't accept accessibility
+  `SET_TEXT`. The agent gets an `is_error` and has to work around it.
 
 ### Validation approach
 
@@ -113,9 +115,21 @@ what is sent.
   * SET_TEXT works only after focusing the field;
   * BACK works;
   * the Send tap reaches Messages (its log shows `send, start`).
-* **End to end against the real API**: HTTPS from the emulator, the error path (a dummy key gives a
-  clean "API key was rejected"), and the UI and service state handling were verified.
-  *Full task runs with a real key: pending at the time of writing (see the demo video).*
+* **End to end against the real API**: HTTPS from the emulator and the error path (a dummy key gives
+  a clean "API key was rejected") were verified. Before every run the target app was force-stopped,
+  so it started from a fresh state. Results on the Oniro 6.1 emulator, 3–4 Oct 2026:
+
+  | Task | Model | Actions | Time | Outcome |
+  |---|---|---|---|---|
+  | Open Settings and go to WLAN | Opus 5.5 | 2 | 15 s | ✔ WLAN page open |
+  | Open Settings and go to WLAN | Haiku 4.5 | 2 | 15 s | ✔ same |
+  | *Napisz do babci SMS, że będę na jej urodzinach* (×3 with the final prompt) | Opus 5.5 | 6 | 31 s each | ✔ 3/3: Messages → "+" → contact picker → Babcia → text "Cześć Babciu, będę na Twoich urodzinach!" → Send. Summary in Polish notes that the phone could not confirm sending (no SIM). |
+  | same task (×3 with the earlier prompt) | Opus 5.5 | 8 | 41–46 s | Same path, but Send was tapped twice and the success flag varied. This led to the "tap Send once, success=true with a note" rule in the prompt. |
+  | Turn on Bluetooth | Opus 5.5 | 3 | 21 s | ✔ toggle on. The emulator has no Bluetooth adapter, so the system state stays "Off". |
+  | Turn off Bluetooth | Sonnet 5.5 | 1 | 10 s | ✔ reported "already off", read correctly from the Settings list |
+  | *Zanotuj: kupić tort dla babci w sobotę* (note) | Opus 5.5 | 10 | ~70 s | Partial. The note body is a WebView editor that accessibility can't type into (one `is_error`). The agent switched to the note title, found its 20-character limit, saved "Sobota: tort babci" and explained this in the summary. |
+
+  The step logs of these runs come from `hilog` (tag `AgentA11y`) and the in-app log.
 
 ---
 
@@ -198,6 +212,13 @@ what is sent.
 * **Status events raced**: an incremental "running" status overtook the final "done" status. Fixed
   with sequential publishing plus instance and version stamps. A `RUN` sent while the service was
   still connecting was lost; fixed with an acknowledgement timeout in the UI.
+* **After the service process was killed** (e.g. `aa force-stop`), the framework restarted it, but
+  through the *older* callbacks (`onConnect`, `onAccessibilityEvent`). The API 20 ones were not
+  called, so the service never subscribed to commands. It now handles both callback sets, and the
+  UI restarts the service (disable + enable) if a Run isn't acknowledged.
+* **Prompt iteration on real runs**: the first SMS runs tapped Send twice and set the success flag
+  inconsistently when the phone (no SIM) gave no confirmation. One rule in the system prompt fixed
+  both: 3/3 runs afterwards took 6 actions and 31 s each.
 * **Lesson**: on a young platform, verify each assumption on the device before building on it.
   Several documented behaviours differed in practice, and each spike took minutes, whereas
   finding the same problem later would have cost hours.

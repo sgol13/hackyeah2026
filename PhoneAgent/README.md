@@ -117,9 +117,12 @@ The prebuilt, signed `.hap` is attached to the GitHub release. Install it with
 
 1. Open **Phone Agent**. "Agent service: on" means the accessibility extension is enabled.
 2. Paste your Anthropic API key and pick a model.
-3. Type a task and tap **Run**. Examples:
-   * *Open Settings and turn on Bluetooth.*
-   * *Napisz do babci SMS, że będę na jej urodzinach.* (the demo adds a contact "Babcia" first)
+3. Type a task and tap **Run**. Examples tested on the emulator (results in
+   [AI_WORKFLOW.md](AI_WORKFLOW.md#validation-approach)):
+   * *Napisz do babci SMS, że będę na jej urodzinach.* Add a contact "Babcia" first. Takes 6
+     actions, about 30 s: Messages → new message → contact picker → Babcia → text → Send.
+   * *Open Settings and go to WLAN.*
+   * *Turn on Bluetooth.*
 4. Watch the agent work. The log shows each step (▶ action, ✖ error, ✔ result). **Stop**
    cancels the task.
 
