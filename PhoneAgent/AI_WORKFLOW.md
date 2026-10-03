@@ -216,6 +216,11 @@ what is sent.
   through the *older* callbacks (`onConnect`, `onAccessibilityEvent`). The API 20 ones were not
   called, so the service never subscribed to commands. It now handles both callback sets, and the
   UI restarts the service (disable + enable) if a Run isn't acknowledged.
+* **Signing from the IDE**: hvigor's `signingConfigs` only accepts passwords encrypted with a
+  DevEco-specific local material folder, so our script-made system-app profile couldn't be used
+  from the IDE. The format is readable in hvigor's own `decipher-util.js`. `scripts/ide-signing.js`
+  generates compatible material, and the project `hvigorfile.ts` injects the config at build time,
+  which keeps `build-profile.json5` free of machine-specific secrets.
 * **Prompt iteration on real runs**: the first SMS runs tapped Send twice and set the success flag
   inconsistently when the phone (no SIM) gave no confirmation. One rule in the system prompt fixed
   both: 3/3 runs afterwards took 6 actions and 31 s each.

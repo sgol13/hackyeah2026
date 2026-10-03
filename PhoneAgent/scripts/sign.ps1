@@ -18,11 +18,15 @@
     4. sign the .hap
 #>
 param(
-    [Parameter(Mandatory = $true)] [string]$InHap,
+    [string]$InHap,
     [string]$OutHap,
     [string]$SdkLib,
-    [string]$Java
+    [string]$Java,
+    # Only create key, certificate, profile and the IDE signing config (no hap needed).
+    [switch]$PrepareOnly,
+    [string]$DevEco = 'C:\Program Files\Huawei\DevEco Studio'
 )
+if (-not $PrepareOnly -and -not $InHap) { throw 'pass -InHap <unsigned.hap> or -PrepareOnly' }
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -45,8 +49,8 @@ if (-not $Java) {
     ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
     if (-not $Java) { throw 'java.exe not found; set JAVA_HOME or pass -Java' }
 }
-if (-not $OutHap) { $OutHap = $InHap -replace '-unsigned\.hap$', '-signed.hap' }
-if ($OutHap -eq $InHap) { $OutHap = $InHap -replace '\.hap$', '-signed.hap' }
+if ($InHap -and -not $OutHap) { $OutHap = $InHap -replace '-unsigned\.hap$', '-signed.hap' }
+if ($InHap -and $OutHap -eq $InHap) { $OutHap = $InHap -replace '\.hap$', '-signed.hap' }
 
 $jar = Join-Path $SdkLib 'hap-sign-tool.jar'
 $ks = Join-Path $work 'keystore.p12'
@@ -98,6 +102,14 @@ $profile.'bundle-info'.'bundle-name' = $bundle
 Invoke-SignTool @('sign-profile', '-keyAlias', 'openharmony application profile release', '-signAlg', 'SHA256withECDSA',
     '-mode', 'localSign', '-profileCertFile', (Join-Path $SdkLib 'OpenHarmonyProfileRelease.pem'),
     '-inFile', $profileJson, '-keystoreFile', $ks, '-outFile', $profileP7b, '-keyPwd', $ksPass, '-keystorePwd', $ksPass)
+
+# Same material for hvigor, so DevEco Studio builds are signed too (see hvigorfile.ts).
+& (Join-Path $DevEco 'tools\node\node.exe') (Join-Path $PSScriptRoot 'ide-signing.js') $work $ksPass $alias
+if ($LASTEXITCODE -ne 0) { throw 'ide-signing.js failed' }
+if ($PrepareOnly) {
+    Write-Host "Signing material ready in $work ($bundle, apl=system_core)"
+    return
+}
 
 Invoke-SignTool @('sign-app', '-keyAlias', $alias, '-signAlg', 'SHA256withECDSA', '-mode', 'localSign',
     '-appCertFile', $chain, '-profileFile', $profileP7b, '-inFile', $InHap, '-keystoreFile', $ks,

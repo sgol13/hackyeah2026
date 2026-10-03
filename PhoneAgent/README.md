@@ -113,6 +113,22 @@ creates a private app key in `.signing/` (git-ignored).
 > (`hdc uninstall com.hackyeah.phoneagent`). The accessibility service only registers new
 > extensions on a fresh install, not on an update.
 
+### Working from DevEco Studio (optional)
+
+1. Run `.\scripts\sign.ps1 -PrepareOnly` once; any `build.ps1` run does this too. It writes a
+   local signing config (`.signing/ide-signing.json`, git-ignored). The project's `hvigorfile.ts`
+   injects it into every hvigor build, so the IDE produces `entry-default-signed.hap`, signed as
+   a system app. hvigor only accepts signing passwords encrypted with a local "material" folder;
+   `scripts/ide-signing.js` generates one.
+2. Set the OpenHarmony SDK location (see step 2 above).
+3. Add an External Tool (*Settings → Tools → External Tools → +*) named **Start Oniro emulator**:
+   program `powershell.exe`, arguments
+   `-NoProfile -ExecutionPolicy Bypass -File "$ProjectFileDir$\scripts\start-emulator.ps1"`,
+   working directory `$ProjectFileDir$`. It boots the emulator if needed, connects hdc and waits
+   for boot (about 20 s). Then run it from *Tools → External Tools*, or add it under
+   *Run → Edit Configurations → entry → Before launch*.
+4. Select device **127.0.0.1:55555** and press **Run**.
+
 The prebuilt, signed `.hap` is attached to the GitHub release. Install it with
 `hdc install phoneagent-signed.hap`.
 
