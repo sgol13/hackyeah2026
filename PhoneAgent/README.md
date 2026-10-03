@@ -93,7 +93,13 @@ To use the DevEco IDE as well, point *Settings → OpenHarmony SDK* at `%LOCALAP
 ```powershell
 .\scripts\build.ps1              # hvigor build -> sign as system app -> hdc install -> start
 .\scripts\build.ps1 -NoInstall   # only produce build\phoneagent-signed.hap
+.\scripts\build.ps1 -Release -NoInstall   # release build -> build\phoneagent-release-signed.hap
 ```
+
+Debug builds have two test hooks that are compiled out of release builds:
+* `aa start ... --ps task "<task>" --pb autorun true` starts a task from hdc;
+* the task `#script <bundle> <text>` runs a scripted stand-in for the model (launch app, tap the
+  element containing `<text>`). It checks the device side without an API key.
 
 `build.ps1` uses DevEco's bundled Node, hvigor and Java, plus the SDK from step 2 (override it
 with `-Sdk` or `OHOS_BASE_SDK_HOME`). Signing is done by `scripts/sign.ps1` (details in

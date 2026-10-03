@@ -6,9 +6,11 @@
 .EXAMPLE
   .\scripts\build.ps1                 # build, sign, install, launch
   .\scripts\build.ps1 -NoInstall      # build + sign only (output: build\phoneagent-signed.hap)
+  .\scripts\build.ps1 -Release -NoInstall   # release build for distribution (debug-only test hooks off)
 #>
 param(
     [switch]$NoInstall,
+    [switch]$Release,
     [string]$DevEco = 'C:\Program Files\Huawei\DevEco Studio',
     # Folder that contains the API 20 *full* OpenHarmony SDK in a "20" subfolder.
     [string]$Sdk = $(if ($env:OHOS_BASE_SDK_HOME) { $env:OHOS_BASE_SDK_HOME } else { Join-Path $env:LOCALAPPDATA 'OpenHarmony\Sdk' }),
@@ -33,7 +35,8 @@ try {
         cmd /c "`"$DevEco\tools\ohpm\bin\ohpm.bat`" install 2>&1"
         if ($LASTEXITCODE -ne 0) { throw "ohpm install failed ($LASTEXITCODE)" }
     }
-    cmd /c "node.exe `"$DevEco\tools\hvigor\bin\hvigorw.js`" --mode module -p product=default -p module=entry@default assembleHap --no-daemon 2>&1"
+    $buildMode = if ($Release) { 'release' } else { 'debug' }
+    cmd /c "node.exe `"$DevEco\tools\hvigor\bin\hvigorw.js`" --mode module -p product=default -p module=entry@default -p buildMode=$buildMode assembleHap --no-daemon 2>&1"
     if ($LASTEXITCODE -ne 0) { throw "hvigor build failed ($LASTEXITCODE)" }
 } finally {
     Pop-Location
@@ -42,7 +45,7 @@ try {
 $unsigned = Join-Path $root 'entry\build\default\outputs\default\entry-default-unsigned.hap'
 $outDir = Join-Path $root 'build'
 New-Item -ItemType Directory -Force $outDir | Out-Null
-$signed = Join-Path $outDir 'phoneagent-signed.hap'
+$signed = Join-Path $outDir $(if ($Release) { 'phoneagent-release-signed.hap' } else { 'phoneagent-signed.hap' })
 & (Join-Path $PSScriptRoot 'sign.ps1') -InHap $unsigned -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
 if (-not $?) { throw 'signing failed' }
 
