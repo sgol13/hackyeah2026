@@ -87,6 +87,9 @@ Extract the five archives from `ohos-sdk/windows/` (`ets`, `js`, `native`, `prev
 `...\Sdk\20\ets\oh-uni-package.json` and so on. Windows' built-in `tar -xf <zip> -C <dir>` is fast.
 
 To use the DevEco IDE as well, point *Settings → OpenHarmony SDK* at `%LOCALAPPDATA%\OpenHarmony\Sdk`.
+Otherwise the IDE's hvigor fails with `00303208 Unable to find 'sdk.dir'`. You can also add
+`sdk.dir=C:/Users/<you>/AppData/Local/OpenHarmony/Sdk` to `local.properties` (per machine,
+git-ignored). The IDE builds an unsigned HAP; sign, install and launch with `scripts\build.ps1`.
 
 ### 3. Build, sign, install, launch
 
