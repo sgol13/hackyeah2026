@@ -1,36 +1,41 @@
-import { launcherBundleManager } from '@kit.AbilityKit';
+import { config } from '@kit.AccessibilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { process } from '@kit.ArkTS';
 
-// OpenHarmony uid = userId * 200000 + appId
-const UID_PER_USER = 200000;
+const A11Y_ABILITY = 'com.hackyeah.phoneagent/AgentA11y';
+const ERR_ALREADY_ENABLED = 9300002;
 
 @Entry
 @Component
 struct Index {
-  @State message: string = 'Loading...';
+  @State message: string = 'Enabling agent service...';
 
   aboutToAppear(): void {
-    // System API (GET_BUNDLE_INFO_PRIVILEGED): only works when signed as system app.
-    const userId = Math.floor(process.uid / UID_PER_USER);
-    launcherBundleManager.getAllLauncherAbilityInfo(userId)
-      .then((infos: Array<launcherBundleManager.LauncherAbilityInfo>) => {
-        const names = infos.map((i: launcherBundleManager.LauncherAbilityInfo) => i.elementName.bundleName);
-        this.message = `Launcher apps: ${infos.length}\n${names.join('\n')}`;
+    this.enableService();
+  }
+
+  private enableService(): void {
+    // System API (WRITE_ACCESSIBILITY_CONFIG): turn on our own accessibility extension.
+    config.enableAbility(A11Y_ABILITY, ['retrieve', 'gesture'])
+      .then(() => {
+        this.message = 'Agent service enabled';
       })
       .catch((err: BusinessError) => {
-        this.message = `getAllLauncherAbilityInfo failed: ${err.code} ${err.message}`;
+        this.message = err.code === ERR_ALREADY_ENABLED ? 'Agent service already enabled' :
+          `enableAbility failed: ${err.code} ${err.message}`;
       });
   }
 
   build() {
-    Scroll() {
+    Column({ space: 16 }) {
       Text(this.message)
-        .id('HelloWorld')
-        .fontSize(14)
-        .padding(16)
+        .id('status')
+        .fontSize(16)
+      Button('Enable agent service')
+        .onClick(() => this.enableService())
     }
+    .padding(24)
     .height('100%')
     .width('100%')
+    .justifyContent(FlexAlign.Center)
   }
 }

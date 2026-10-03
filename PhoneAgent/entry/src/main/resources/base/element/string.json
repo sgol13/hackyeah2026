@@ -2,15 +2,27 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "Phone Agent: drives apps on the phone for you"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "Phone Agent"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "Phone Agent"
+    },
+    {
+      "name": "a11y_label",
+      "value": "Phone Agent service"
+    },
+    {
+      "name": "a11y_desc",
+      "value": "Reads the screen and taps/types on your behalf when you give Phone Agent a task"
+    },
+    {
+      "name": "a11y_rationale",
+      "value": "Needed to read on-screen elements and operate other apps"
     }
   ]
 }
