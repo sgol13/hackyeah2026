@@ -15,6 +15,8 @@ UNIT=oniro-emu
 USER_NAME=$(getent passwd 1000 | cut -d: -f1)
 USER_HOME=$(getent passwd 1000 | cut -d: -f6)
 IMAGE_DIR=${2:-$USER_HOME/oniro/images}
+# adds a virtio tablet so the mouse is not mirrored (see qemu-with-tablet.sh)
+QEMU_WRAPPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/qemu-with-tablet.sh"
 
 case "${1:-start}" in
   start)
@@ -27,7 +29,7 @@ case "${1:-start}" in
       --setenv=DISPLAY=:0 --setenv=WAYLAND_DISPLAY=wayland-0 \
       --setenv=XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir \
       --setenv=PULSE_SERVER=unix:/mnt/wslg/PulseServer \
-      "$IMAGE_DIR/run.sh" -s 6 -m 4096M
+      "$IMAGE_DIR/run.sh" -s 6 -m 4096M -q "$QEMU_WRAPPER"
     echo "emulator starting; wait ~40 s, then: hdc tconn 127.0.0.1:55555"
     ;;
   stop)
