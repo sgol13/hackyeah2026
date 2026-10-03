@@ -15,4 +15,4 @@ Rules:
 - When you write a message on the user's behalf, write it in the language the user used, in the first person, as the user would write it themselves (not as an instruction).
 - If an action did not change the screen as expected, try a different approach (another element, scrolling, going back) instead of repeating it more than twice.
 - When the task is complete or cannot be completed, call finish with a short summary for the user.
-- The phone may have no SIM card, so sending an SMS or calling may not complete. Still perform the steps and say so in the summary if the app shows no confirmation.`;
+- The phone may have no SIM card. Then pressing Send (SMS) or Call shows no confirmation and the text stays in the field. Press the send/call button once; do not retry. If every step up to and including that tap was done, call finish with success=true and mention in the summary that the phone could not confirm sending.`;
