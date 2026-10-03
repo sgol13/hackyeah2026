@@ -1,86 +1,171 @@
-import { AccessibilityAction, AccessibilityEventInfo, AccessibilityExtensionAbility } from '@kit.AccessibilityKit';
-import { BusinessError, commonEventManager } from '@kit.BasicServicesKit';
+/**
+ * Phone Agent service: an AccessibilityExtensionAbility that hosts the agent loop.
+ * Runs in its own process and stays connected while other apps are in the
+ * foreground, which is where the agent has to read and operate the UI.
+ */
+import { AccessibilityEventInfo, AccessibilityExtensionAbility } from '@kit.AccessibilityKit';
+import { Want } from '@kit.AbilityKit';
+import { commonEventManager } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { clickElement, globalAction, readScreen, setElementText } from './ScreenReader';
-import { serializeScreen } from '../agent/ScreenText';
+import { AnthropicClient, ApiMessage, findModel, MessagesResponse } from '../agent/Anthropic';
+import { AgentListener, AgentLoop, Llm, LOG_ERROR } from '../agent/AgentLoop';
+import { SYSTEM_PROMPT } from '../agent/Prompt';
+import { TOOLS } from '../agent/Tools';
+import {
+  AgentStatus,
+  EVT_RUN,
+  EVT_STATUS,
+  EVT_STOP,
+  EVT_SYNC,
+  LogEntry,
+  OWN_BUNDLE,
+  publishEvent,
+  RunRequest,
+  subscribeEvents,
+  unsubscribeEvents
+} from '../common/Bridge';
+import { loadSettings } from '../common/Settings';
+import { DeviceExecutor } from './DeviceExecutor';
 
 const DOMAIN = 0x0A11;
 const TAG = 'AgentA11y';
-/** Spike-only debug channel: hdc shell cem publish -e com.hackyeah.phoneagent.DEBUG -d "dump" */
-const DEBUG_EVENT = 'com.hackyeah.phoneagent.DEBUG';
+const MAX_LOG_TEXT = 600;
+const RETURN_TO_UI_DELAY_MS = 3000;
+
+class ClaudeLlm implements Llm {
+  private client: AnthropicClient;
+
+  constructor(client: AnthropicClient) {
+    this.client = client;
+  }
+
+  send(messages: ApiMessage[]): Promise<MessagesResponse> {
+    return this.client.createMessage(this.client.buildRequest(SYSTEM_PROMPT, TOOLS, messages));
+  }
+}
+
+class StatusPublisher implements AgentListener {
+  private owner: AgentA11y;
+
+  constructor(owner: AgentA11y) {
+    this.owner = owner;
+  }
+
+  log(kind: string, text: string): void {
+    this.owner.addLog(kind, text);
+  }
+}
 
 export default class AgentA11y extends AccessibilityExtensionAbility {
-  private subscriber?: commonEventManager.CommonEventSubscriber;
+  private subscriber: commonEventManager.CommonEventSubscriber | undefined = undefined;
+  private loop: AgentLoop | undefined = undefined;
+  private running: boolean = false;
+  private entries: LogEntry[] = [];
+  private seq: number = 0;
+  private readonly instance: number = Date.now();
+  private statusVersion: number = 0;
+  /** statuses are published one after another so the UI receives them in order */
+  private publishQueue: Promise<void> = Promise.resolve();
 
   onAccessibilityConnect(): void {
-    hilog.info(DOMAIN, TAG, 'onAccessibilityConnect');
-    this.subscribeDebug();
-  }
-
-  onAccessibilityDisconnect(): void {
-    hilog.info(DOMAIN, TAG, 'onAccessibilityDisconnect');
-    if (this.subscriber) {
-      commonEventManager.unsubscribe(this.subscriber);
-      this.subscriber = undefined;
-    }
-  }
-
-  onAccessibilityEventInfo(event: AccessibilityEventInfo): void {
-  }
-
-  private subscribeDebug(): void {
-    if (this.subscriber) {
-      return;
-    }
-    commonEventManager.createSubscriber({ events: [DEBUG_EVENT] })
+    hilog.info(DOMAIN, TAG, 'service connected');
+    subscribeEvents([EVT_RUN, EVT_STOP, EVT_SYNC], (event: string, data: string) => this.onEvent(event, data))
       .then((sub: commonEventManager.CommonEventSubscriber) => {
         this.subscriber = sub;
-        commonEventManager.subscribe(sub, (err: BusinessError, data: commonEventManager.CommonEventData) => {
-          if (err) {
-            hilog.error(DOMAIN, TAG, 'debug event error %{public}d', err.code);
-            return;
-          }
-          this.handleDebug(data.data ?? '');
-        });
-        hilog.info(DOMAIN, TAG, 'debug channel ready');
       })
-      .catch((err: BusinessError) => {
-        hilog.error(DOMAIN, TAG, 'createSubscriber failed %{public}d %{public}s', err.code, err.message);
+      .catch((err: Error) => {
+        hilog.error(DOMAIN, TAG, 'subscribe failed: %{public}s', err.message);
       });
   }
 
-  private async handleDebug(cmd: string): Promise<void> {
-    hilog.info(DOMAIN, TAG, 'cmd: %{public}s', cmd);
-    try {
-      const t0 = Date.now();
-      const snap = await readScreen(this.context);
-      const screen = serializeScreen(snap.nodes, 150);
-      hilog.info(DOMAIN, TAG, 'read %{public}s: %{public}d raw nodes in %{public}d ms',
-        snap.bundleName, snap.nodes.length, Date.now() - t0);
-      const sep = cmd.indexOf(':');
-      const verb = sep >= 0 ? cmd.substring(0, sep) : cmd;
-      const arg = sep >= 0 ? cmd.substring(sep + 1) : '';
-      if (verb === 'dump') {
-        for (const line of screen.text.split('\n')) {
-          hilog.info(DOMAIN, TAG, '%{public}s', line);
-        }
-      } else if (verb === 'click') {
-        const i = screen.indexMap[parseInt(arg)];
-        await clickElement(snap.elements[i]);
-        hilog.info(DOMAIN, TAG, 'clicked [%{public}s]', arg);
-      } else if (verb === 'type') {
-        const sep2 = arg.indexOf(':');
-        const i = screen.indexMap[parseInt(arg.substring(0, sep2))];
-        await setElementText(snap.elements[i], arg.substring(sep2 + 1));
-        hilog.info(DOMAIN, TAG, 'typed into [%{public}s]', arg);
-      } else if (verb === 'back') {
-        await globalAction(this.context, AccessibilityAction.BACK);
-      } else if (verb === 'home') {
-        await globalAction(this.context, AccessibilityAction.HOME);
-      }
-    } catch (e) {
-      const err = e as BusinessError;
-      hilog.error(DOMAIN, TAG, 'cmd %{public}s failed: %{public}d %{public}s', cmd, err.code, err.message);
+  onAccessibilityDisconnect(): void {
+    hilog.info(DOMAIN, TAG, 'service disconnected');
+    this.loop?.stop();
+    unsubscribeEvents(this.subscriber);
+    this.subscriber = undefined;
+  }
+
+  onAccessibilityEventInfo(event: AccessibilityEventInfo): void {
+    // The agent reads the UI on demand; individual events are not needed.
+  }
+
+  addLog(kind: string, text: string): void {
+    const clipped = text.length > MAX_LOG_TEXT ? text.substring(0, MAX_LOG_TEXT) + '…' : text;
+    const entry: LogEntry = { seq: ++this.seq, kind: kind, text: clipped };
+    this.entries.push(entry);
+    hilog.info(DOMAIN, TAG, '[%{public}s] %{public}s', kind, clipped);
+    this.publishStatus(false, [entry]);
+  }
+
+  private publishStatus(full: boolean, entries: LogEntry[]): void {
+    const status: AgentStatus = {
+      instance: this.instance,
+      version: ++this.statusVersion,
+      running: this.running,
+      full: full,
+      entries: entries
+    };
+    const data = JSON.stringify(status);
+    this.publishQueue = this.publishQueue
+      .then(() => publishEvent(EVT_STATUS, data))
+      .catch((err: Error) => {
+        hilog.error(DOMAIN, TAG, 'publish failed: %{public}s', err.message);
+      });
+  }
+
+  private onEvent(event: string, data: string): void {
+    if (event === EVT_RUN) {
+      this.startRun(data);
+    } else if (event === EVT_STOP) {
+      this.loop?.stop();
+    } else if (event === EVT_SYNC) {
+      this.publishStatus(true, this.entries);
     }
+  }
+
+  private async startRun(data: string): Promise<void> {
+    if (this.running) {
+      this.addLog(LOG_ERROR, 'A task is already running.');
+      return;
+    }
+    let req: RunRequest;
+    try {
+      req = JSON.parse(data) as RunRequest;
+    } catch (e) {
+      this.addLog(LOG_ERROR, 'Malformed run request.');
+      return;
+    }
+    if (typeof req.task !== 'string' || req.task.trim().length === 0) {
+      this.addLog(LOG_ERROR, 'The task is empty.');
+      return;
+    }
+    const settings = loadSettings(this.context, true);
+    if (settings.apiKey.length === 0) {
+      this.addLog(LOG_ERROR, 'No Anthropic API key set. Enter it in Phone Agent first.');
+      return;
+    }
+    this.entries = [];
+    this.running = true;
+    const client = new AnthropicClient(settings.apiKey, findModel(req.model));
+    const loop = new AgentLoop(new ClaudeLlm(client), new DeviceExecutor(this.context), new StatusPublisher(this));
+    this.loop = loop;
+    try {
+      await loop.run(req.task.trim());
+    } catch (e) {
+      this.addLog(LOG_ERROR, `Unexpected failure: ${(e as Error).message}`);
+    } finally {
+      this.running = false;
+      this.loop = undefined;
+      this.publishStatus(true, this.entries);
+    }
+    // Leave the result visible in the target app for a moment, then show the log.
+    setTimeout(() => this.showUi(), RETURN_TO_UI_DELAY_MS);
+  }
+
+  private showUi(): void {
+    const want: Want = { bundleName: OWN_BUNDLE, abilityName: 'EntryAbility' };
+    this.context.startAbility(want).catch((err: Error) => {
+      hilog.warn(DOMAIN, TAG, 'could not reopen UI: %{public}s', err.message);
+    });
   }
 }

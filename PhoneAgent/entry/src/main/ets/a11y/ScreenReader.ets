@@ -82,6 +82,19 @@ export async function clickElement(el: AccessibilityElement): Promise<void> {
   await target.executeAction(AccessibilityAction.CLICK);
 }
 
+/** Scrolls the element, or its nearest scrollable ancestor. */
+export async function scrollElement(el: AccessibilityElement, forward: boolean): Promise<void> {
+  let target: AccessibilityElement = el;
+  for (let i = 0; i < 6 && !(target.scrollable ?? false); i++) {
+    try {
+      target = await target.getParent();
+    } catch (e) {
+      throw new Error('Element is not inside a scrollable container');
+    }
+  }
+  await target.executeAction(forward ? AccessibilityAction.SCROLL_FORWARD : AccessibilityAction.SCROLL_BACKWARD);
+}
+
 export async function setElementText(el: AccessibilityElement, text: string): Promise<void> {
   const param: Parameter = { setText: text };
   await el.executeAction(AccessibilityAction.SET_TEXT, param);
