@@ -57,6 +57,14 @@ export default function openAiCompatTest() {
       expect(req.tools[0].function.name).assertEqual(TOOLS[0].name);
     });
 
+    it('sends reasoning_effort only when chosen', 0, () => {
+      expect(buildOpenAiRequest('gpt-5', 'SYSTEM', TOOLS, conversation(), 'high').reasoning_effort).assertEqual('high');
+      expect(JSON.stringify(buildOpenAiRequest('gpt-5', 'SYSTEM', TOOLS, conversation())))
+        .assertEqual(JSON.stringify(buildOpenAiRequest('gpt-5', 'SYSTEM', TOOLS, conversation(), '')));
+      expect(JSON.stringify(buildOpenAiRequest('gpt-5', 'SYSTEM', TOOLS, conversation())).indexOf('reasoning_effort'))
+        .assertEqual(-1);
+    });
+
     it('maps tool_calls to tool_use blocks', 0, () => {
       const r = parseOpenAiResponse('{"id":"chatcmpl-1","model":"gpt-5","choices":[{"finish_reason":"tool_calls",' +
         '"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_9","type":"function",' +

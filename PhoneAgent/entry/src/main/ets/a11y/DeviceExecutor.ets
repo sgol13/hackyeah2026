@@ -38,6 +38,14 @@ export class DeviceExecutor implements Executor {
 
   constructor(ctx: AccessibilityExtensionContext) {
     this.ctx = ctx;
+    this.loadApps().catch(() => {
+      // labels are a nicety; launch_app loads the list again when needed
+    });
+  }
+
+  appLabel(bundleName: string): string {
+    const app = this.apps.find((a: AppEntry) => a.bundleName === bundleName);
+    return app === undefined ? '' : app.label;
   }
 
   private async loadApps(): Promise<void> {

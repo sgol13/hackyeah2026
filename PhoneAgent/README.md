@@ -1,8 +1,8 @@
-# Phone Agent
+# Oniro Agent
 
 HackYeah 2026, Huawei challenge. You type "text grandma that I'll come to her birthday" and an AI model does it on the phone: opens Messages, picks the contact, types, sends. Works with any app through accessibility. Only possible on OpenHarmony / Oniro (system app).
 
-AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gemini (implemented and unit-tested; live endpoints checked only with an invalid key, no real keys).
+AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gemini (implemented and unit-tested; live endpoints checked only with an invalid key, no real keys). Model and reasoning effort are chosen in Settings; effort levels per model follow the providers' docs as of 2026-10-04 and were not checked live.
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [AI_WORKFLOW.md](AI_WORKFLOW.md)
@@ -53,14 +53,19 @@ Prebuilt `.hap` in GitHub Releases: `hdc install phoneagent-signed.hap`. If an o
 
 ## Use
 
-Provider → API key → model (or "Custom model ID…") → task → **Run**. Each provider keeps its own key. To test the SMS task, add a contact "Babcia" first.
+Settings (sliders icon, top right) → AI provider → API key → model (or "Custom model ID…"). Each provider keeps its own key. Back on the main screen type the task and tap the round button. To test the SMS task, add a contact "Babcia" first.
+
+Outside the app, tap the floating Oniro Agent orb (drag it to either edge) to give a task without leaving the app you are in. Progress shows in a pill at the top; tap it for the steps, Stop, or to open the app. Turn the orb off in Settings.
+
+Long-press Home does not open the agent yet: the stock navigation bar has no long-press handler (see ARCHITECTURE.md); the orb is the way to open it from other apps.
 
 ## Check
 
-- Tests: `.\scripts\test.ps1` → `Pass: 51`
+- Tests: `.\scripts\test.ps1` → `Pass: 77`
+- Screenshot: `.\scripts\screenshot.ps1 -Name main` → `build\shots\main.jpeg`
 - System app: `hdc shell "bm dump -n com.hackyeah.phoneagent" | findstr appPrivilegeLevel` → `system_core`
 - Log: `hdc shell "hilog -x" | findstr AgentA11y`
 
 ## Not ours
 
-DevEco template, OpenHarmony SDK + public test signing certs, Oniro emulator. No runtime libraries.
+DevEco template, OpenHarmony SDK + public test signing certs, Oniro emulator, Bricolage Grotesque font (OFL, `entry/src/main/resources/rawfile/fonts/OFL.txt`). No runtime libraries.

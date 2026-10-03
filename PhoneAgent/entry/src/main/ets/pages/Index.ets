@@ -1,89 +1,51 @@
-import { config } from '@kit.AccessibilityKit';
 import { common } from '@kit.AbilityKit';
-import { BusinessError, commonEventManager } from '@kit.BasicServicesKit';
-import { LOG_ACTION, LOG_DONE, LOG_ERROR, LOG_TASK } from '../agent/AgentLoop';
-import { isValidModelId, ModelChoice, ProviderInfo, PROVIDERS } from '../agent/Providers';
-import {
-  AgentStatus,
-  EVT_RUN,
-  EVT_STATUS,
-  EVT_STOP,
-  EVT_SYNC,
-  LogEntry,
-  OWN_A11Y_ABILITY,
-  publishEvent,
-  RunRequest,
-  subscribeEvents,
-  unsubscribeEvents
-} from '../common/Bridge';
-import { loadApiKey, loadSettings, saveApiKey, saveSettings } from '../common/Settings';
+import { LengthMetrics } from '@kit.ArkUI';
+import { commonEventManager } from '@kit.BasicServicesKit';
+import { findProvider, modelSummary, PROVIDERS } from '../agent/Providers';
+import { AgentClient } from '../common/AgentClient';
+import { EVT_STATUS, ORIGIN_APP, RunRequest, subscribeEvents, unsubscribeEvents } from '../common/Bridge';
+import { DISPLAY_FONT } from '../common/Fonts';
+import { checkRun } from '../common/RunCheck';
+import { AgentSettings, KEY_SERVICE_READY, loadSettings } from '../common/Settings';
+import { StatusTracker } from '../common/StatusTracker';
+import { buildTimeline, Step } from '../common/Timeline';
+import { Composer } from '../components/Composer';
+import { OaMark } from '../components/OaMark';
+import { StepList } from '../components/StepList';
 import { KEY_INCOMING_AUTORUN, KEY_INCOMING_TASK } from '../entryability/EntryAbility';
 
-const ERR_ALREADY_ENABLED = 9300002;
 const AUTORUN_DELAY_MS = 1500;
-const SERVICE_ACK_TIMEOUT_MS = 5000;
-const SERVICE_PING_TIMEOUT_MS = 8000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-const CUSTOM_MODEL_LABEL = 'Custom model ID…';
-
-function providerIndexOf(id: string): number {
-  const i = PROVIDERS.findIndex((p: ProviderInfo) => p.id === id);
-  return i >= 0 ? i : 0;
-}
-
-function modelOptions(p: ProviderInfo): SelectOption[] {
-  const options = p.models.map((m: ModelChoice) => {
-    const o: SelectOption = { value: m.label };
-    return o;
-  });
-  const custom: SelectOption = { value: CUSTOM_MODEL_LABEL };
-  options.push(custom);
-  return options;
-}
+const SUGGESTIONS: string[] = [
+  'Text Babcia that I will come to her birthday',
+  'Turn on Wi-Fi',
+  'Set an alarm for 7:00'
+];
 
 @Entry
 @Component
 struct Index {
-  @State providerIndex: number = 0;
-  @State apiKey: string = '';
-  /** index into the provider's models; models.length = custom model ID */
-  @State modelIndex: number = 0;
-  @State customModel: string = '';
+  @State settings: AgentSettings = {
+    provider: PROVIDERS[0].id, model: PROVIDERS[0].models[0].id, apiKey: '', effort: ''
+  };
   @State task: string = '';
   @State running: boolean = false;
-  @State serviceReady: boolean = false;
+  @State starting: boolean = false;
+  @StorageLink(KEY_SERVICE_READY) serviceReady: boolean = false;
   @State notice: string = '';
-  @State entries: LogEntry[] = [];
+  @State steps: Step[] = [];
+  private tracker: StatusTracker = new StatusTracker();
+  private client: AgentClient = new AgentClient(this.tracker);
   private subscriber: commonEventManager.CommonEventSubscriber | undefined = undefined;
-  /** number of statuses received from the service (any status proves it is listening) */
-  private statusesSeen: number = 0;
-  private statusInstance: number = 0;
-  private statusVersion: number = 0;
 
   private ctx(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
   aboutToAppear(): void {
-    const settings = loadSettings(this.ctx(), false);
-    this.providerIndex = providerIndexOf(settings.provider);
-    this.apiKey = settings.apiKey;
-    const models = PROVIDERS[this.providerIndex].models;
-    const i = models.findIndex((m: ModelChoice) => m.id === settings.model);
-    if (i >= 0) {
-      this.modelIndex = i;
-    } else {
-      this.modelIndex = models.length;
-      this.customModel = settings.model;
-    }
     subscribeEvents([EVT_STATUS], (event: string, data: string) => this.onStatus(data))
       .then((sub: commonEventManager.CommonEventSubscriber) => {
         this.subscriber = sub;
-        return publishEvent(EVT_SYNC, '');
+        this.client.sync();
       })
       .catch(() => {
         this.notice = 'Could not connect to the agent service.';
@@ -96,7 +58,8 @@ struct Index {
   }
 
   onPageShow(): void {
-    publishEvent(EVT_SYNC, '').catch(() => {});
+    this.settings = loadSettings(this.ctx(), false);
+    this.client.sync();
     const incoming = AppStorage.get<string>(KEY_INCOMING_TASK);
     if (incoming !== undefined && incoming.length > 0) {
       this.task = incoming;
@@ -109,268 +72,169 @@ struct Index {
   }
 
   private enableService(): void {
-    // System API (WRITE_ACCESSIBILITY_CONFIG): switch on our own accessibility extension.
-    config.enableAbility(OWN_A11Y_ABILITY, ['retrieve', 'gesture'])
-      .then(() => {
-        this.serviceReady = true;
-      })
-      .catch((err: BusinessError) => {
-        if (err.code === ERR_ALREADY_ENABLED) {
-          this.serviceReady = true;
-        } else {
-          this.notice = `Agent service unavailable (${err.code}): ${err.message}`;
-        }
-      });
+    this.client.enableService().then((msg: string) => {
+      this.serviceReady = msg.length === 0;
+      if (msg.length > 0) {
+        this.notice = msg;
+      }
+    });
   }
 
   private onStatus(data: string): void {
-    let status: AgentStatus;
-    try {
-      status = JSON.parse(data) as AgentStatus;
-    } catch (e) {
-      return;
-    }
-    this.statusesSeen++;
-    if (status.instance === this.statusInstance && status.version <= this.statusVersion) {
-      return; // stale or duplicate
-    }
-    this.statusInstance = status.instance;
-    this.statusVersion = status.version;
-    this.running = status.running;
-    if (status.full) {
-      this.entries = status.entries;
-      return;
-    }
-    const lastSeq = this.entries.length > 0 ? this.entries[this.entries.length - 1].seq : 0;
-    for (const e of status.entries) {
-      if (e.seq > lastSeq || e.seq === 1) {
-        if (e.seq === 1) {
-          this.entries = [];
-        }
-        this.entries.push(e);
-      }
+    if (this.tracker.apply(data)) {
+      this.steps = buildTimeline(this.tracker.entries);
+      this.running = this.tracker.running;
     }
   }
 
-  private provider(): ProviderInfo {
-    return PROVIDERS[this.providerIndex];
+  private providerLabel(): string {
+    const p = findProvider(this.settings.provider);
+    return p === undefined ? this.settings.provider : p.label;
   }
 
-  private isCustomModel(): boolean {
-    return this.modelIndex >= this.provider().models.length;
+  private hasKey(): boolean {
+    return this.settings.apiKey.trim().length > 0;
   }
 
-  private selectedModel(): string {
-    return this.isCustomModel() ? this.customModel.trim() : this.provider().models[this.modelIndex].id;
-  }
-
-  /** Keeps each provider's key: save the one being left, load the one being switched to. */
-  private async switchProvider(index: number): Promise<void> {
-    if (index === this.providerIndex) {
-      return;
-    }
-    await saveApiKey(this.ctx(), this.provider().id, this.apiKey);
-    this.providerIndex = index;
-    this.apiKey = loadApiKey(this.ctx(), this.provider().id, false);
-    this.modelIndex = 0;
-    this.customModel = '';
+  private openSettings(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Settings' });
   }
 
   private async run(): Promise<void> {
-    const task = this.task.trim();
-    const provider = this.provider();
-    if (this.apiKey.trim().length === 0) {
-      this.notice = `Enter your ${provider.label} API key first.`;
+    const problem = checkRun(this.providerLabel(), this.settings.apiKey, this.settings.model, this.task);
+    if (problem.length > 0) {
+      this.notice = problem;
       return;
     }
-    const model = this.selectedModel();
-    if (!isValidModelId(model)) {
-      this.notice = 'Enter a valid model ID (letters, digits, . _ - : /).';
-      return;
-    }
-    if (task.length === 0) {
-      this.notice = 'Describe what the agent should do.';
-      return;
-    }
-    await saveSettings(this.ctx(), { provider: provider.id, model: model, apiKey: this.apiKey });
     this.notice = '';
+    this.starting = true;
     this.running = true;
-    // Make sure the service is listening (e.g. right after boot it may still be connecting).
-    if (!(await this.waitForService(SERVICE_PING_TIMEOUT_MS))) {
-      this.notice = 'Starting the agent service…';
-      await this.restartService();
-      if (!(await this.waitForService(2 * SERVICE_PING_TIMEOUT_MS))) {
-        this.running = false;
-        this.notice = 'The agent service is not responding. Try again in a moment.';
-        return;
-      }
-      this.notice = '';
-    }
-    this.entries = [];
-    this.running = true; // the ping's status reply reset it
-    const req: RunRequest = { task: task, provider: provider.id, model: model };
-    const versionBefore = this.statusVersion;
-    try {
-      await publishEvent(EVT_RUN, JSON.stringify(req));
-    } catch (e) {
+    this.steps = [];
+    const req: RunRequest = {
+      task: this.task.trim(), provider: this.settings.provider, model: this.settings.model,
+      effort: this.settings.effort, origin: ORIGIN_APP
+    };
+    const msg = await this.client.run(req);
+    this.starting = false;
+    if (msg.length > 0) {
       this.running = false;
-      this.notice = 'Could not reach the agent service.';
-      return;
+      this.notice = msg;
     }
-    // The service answers every RUN with a status; if none arrives it was not listening yet.
-    setTimeout(() => {
-      if (this.running && this.statusVersion === versionBefore) {
-        this.running = false;
-        this.notice = 'The agent service did not respond. It is being restarted, tap Run again in a moment.';
-        this.restartService();
-      }
-    }, SERVICE_ACK_TIMEOUT_MS);
   }
 
-  /** Pings the service with SYNC until it answers with a status, or the timeout passes. */
-  private async waitForService(timeoutMs: number): Promise<boolean> {
-    const before = this.statusesSeen;
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      try {
-        await publishEvent(EVT_SYNC, '');
-      } catch (e) {
-        // keep trying until the deadline
+  private stop(): void {
+    this.client.stop().then((msg: string) => {
+      if (msg.length > 0) {
+        this.notice = msg;
       }
-      for (let i = 0; i < 10 && Date.now() < deadline; i++) {
-        await sleep(100);
-        if (this.statusesSeen > before) {
-          return true;
+    });
+  }
+
+  @Builder
+  emptyState() {
+    Column({ space: 20 }) {
+      Text('What should I do?')
+        .fontFamily(DISPLAY_FONT)
+        .fontSize(34)
+        .fontColor($r('app.color.ink'))
+      if (!this.hasKey()) {
+        Text('Add an API key to get started.')
+          .fontSize(16)
+          .fontColor($r('app.color.ink_muted'))
+        Button('Open Settings')
+          .backgroundColor($r('app.color.orb_violet'))
+          .fontColor($r('app.color.on_orb'))
+          .onClick(() => this.openSettings())
+      } else {
+        Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
+          ForEach(SUGGESTIONS, (s: string) => {
+            Text(s)
+              .fontSize(15)
+              .fontColor($r('app.color.ink'))
+              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+              .borderRadius(18)
+              .border({ width: 1, color: $r('app.color.line') })
+              .backgroundColor($r('app.color.surface'))
+              .onClick(() => {
+                this.task = s;
+              })
+          }, (s: string) => s)
         }
       }
     }
-    return false;
-  }
-
-  /** Reconnects a service process that is enabled but not listening (e.g. after it was killed). */
-  private async restartService(): Promise<void> {
-    this.serviceReady = false;
-    try {
-      await config.disableAbility(OWN_A11Y_ABILITY);
-    } catch (e) {
-      // not enabled: fine, enable below
-    }
-    this.enableService();
-  }
-
-  private entryColor(kind: string): ResourceColor {
-    if (kind === LOG_ERROR) {
-      return '#C62828';
-    }
-    if (kind === LOG_DONE) {
-      return '#2E7D32';
-    }
-    if (kind === LOG_ACTION) {
-      return '#1565C0';
-    }
-    return '#424242';
-  }
-
-  private entryPrefix(kind: string): string {
-    if (kind === LOG_ERROR) {
-      return '✖ ';
-    }
-    if (kind === LOG_DONE) {
-      return '✔ ';
-    }
-    if (kind === LOG_ACTION) {
-      return '▶ ';
-    }
-    if (kind === LOG_TASK) {
-      return 'Task: ';
-    }
-    return '';
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .padding({ top: 48 })
   }
 
   build() {
-    Column({ space: 10 }) {
-      Text('Phone Agent')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .width('100%')
-      Text(this.serviceReady ? 'Agent service: on' : 'Agent service: off')
-        .fontSize(12)
-        .fontColor(this.serviceReady ? '#2E7D32' : '#C62828')
-        .width('100%')
-        .onClick(() => this.enableService())
-      Select(PROVIDERS.map((p: ProviderInfo) => {
-        const o: SelectOption = { value: p.label };
-        return o;
-      }))
-        .selected(this.providerIndex)
-        .value(this.provider().label)
-        .width('100%')
-        .onSelect((index: number) => {
-          this.switchProvider(index);
-        })
-      TextInput({ placeholder: this.provider().keyHint, text: this.apiKey })
-        .type(InputType.Password)
-        .onChange((v: string) => {
-          this.apiKey = v;
-        })
-      Select(modelOptions(this.provider()))
-        .selected(this.modelIndex)
-        .value(this.isCustomModel() ? CUSTOM_MODEL_LABEL : this.provider().models[this.modelIndex].label)
-        .width('100%')
-        .onSelect((index: number) => {
-          this.modelIndex = index;
-        })
-      if (this.isCustomModel()) {
-        TextInput({ placeholder: 'Model ID, e.g. gpt-5.1', text: this.customModel })
-          .onChange((v: string) => {
-            this.customModel = v;
-          })
-      }
-      TextArea({ placeholder: 'What should I do? e.g. "Text grandma that I will come to her birthday"', text: this.task })
-        .height(90)
-        .onChange((v: string) => {
-          this.task = v;
-        })
+    Column({ space: 12 }) {
       Row({ space: 10 }) {
-        Button(this.running ? 'Running…' : 'Run')
-          .id('run')
+        OaMark({ markSize: 32, spinning: this.running })
+        Text('Oniro Agent')
+          .fontFamily(DISPLAY_FONT)
+          .fontSize(20)
+          .fontColor($r('app.color.ink'))
           .layoutWeight(1)
-          .enabled(!this.running && this.serviceReady)
-          .onClick(() => this.run())
-        Button('Stop')
-          .layoutWeight(1)
-          .type(ButtonType.Capsule)
-          .backgroundColor('#757575')
-          .enabled(this.running)
-          .onClick(() => {
-            publishEvent(EVT_STOP, '').catch(() => {
-              this.notice = 'Could not reach the agent service.';
-            });
-          })
+        Image($r('app.media.ic_settings'))
+          .id('settings')
+          .width(24)
+          .height(24)
+          .fillColor($r('app.color.ink'))
+          .padding(10)
+          .width(44)
+          .height(44)
+          .accessibilityText('Settings')
+          .onClick(() => this.openSettings())
       }
       .width('100%')
-      if (this.notice.length > 0) {
-        Text(this.notice)
-          .fontSize(13)
-          .fontColor('#C62828')
-          .width('100%')
-      }
-      List({ space: 6 }) {
-        ForEach(this.entries, (e: LogEntry) => {
-          ListItem() {
-            Text(this.entryPrefix(e.kind) + e.text)
-              .fontSize(13)
-              .fontColor(this.entryColor(e.kind))
-              .fontStyle(e.kind === 'thought' ? FontStyle.Italic : FontStyle.Normal)
-              .width('100%')
-          }
-        }, (e: LogEntry) => e.seq.toString())
+
+      Column() {
+        if (this.steps.length === 0) {
+          this.emptyState()
+        } else {
+          StepList({ steps: this.steps, running: this.running })
+        }
       }
       .layoutWeight(1)
       .width('100%')
+
+      if (this.notice.length > 0) {
+        Text(this.notice)
+          .fontSize(14)
+          .fontColor($r('app.color.danger'))
+          .width('100%')
+      }
+      Composer({
+        text: $task,
+        running: this.running,
+        canRun: this.serviceReady && !this.starting,
+        onRun: () => this.run(),
+        onStop: () => this.stop()
+      })
+      Row({ space: 8 }) {
+        Text(modelSummary(this.settings.provider, this.settings.model, this.settings.effort))
+          .fontSize(13)
+          .fontColor($r('app.color.ink_muted'))
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(12)
+          .border({ width: 1, color: $r('app.color.line') })
+          .onClick(() => this.openSettings())
+        Blank()
+        Circle()
+          .width(8)
+          .height(8)
+          .fill(this.serviceReady ? $r('app.color.orb_teal') : $r('app.color.danger'))
+        Text(this.serviceReady ? 'Agent service on' : 'Agent service off')
+          .fontSize(13)
+          .fontColor($r('app.color.ink_muted'))
+          .onClick(() => this.enableService())
+      }
+      .width('100%')
     }
-    .padding(16)
+    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
     .width('100%')
     .height('100%')
+    .backgroundColor($r('app.color.bg'))
   }
 }

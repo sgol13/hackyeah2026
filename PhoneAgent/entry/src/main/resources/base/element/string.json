@@ -2,23 +2,23 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "Phone Agent: drives apps on the phone for you"
+      "value": "Oniro Agent: uses the apps on your phone for you"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Phone Agent"
+      "value": "Oniro Agent"
     },
     {
       "name": "EntryAbility_label",
-      "value": "Phone Agent"
+      "value": "Oniro Agent"
     },
     {
       "name": "a11y_label",
-      "value": "Phone Agent service"
+      "value": "Oniro Agent service"
     },
     {
       "name": "a11y_desc",
-      "value": "Reads the screen and taps/types on your behalf when you give Phone Agent a task"
+      "value": "Reads the screen and taps/types on your behalf when you give Oniro Agent a task"
     },
     {
       "name": "a11y_rationale",

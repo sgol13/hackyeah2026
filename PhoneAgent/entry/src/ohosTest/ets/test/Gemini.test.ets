@@ -56,6 +56,14 @@ export default function geminiTest() {
       expect(req.toolConfig.functionCallingConfig.mode).assertEqual('AUTO');
     });
 
+    it('maps effort to a thinking level', 0, () => {
+      const msgs: ApiMessage[] = [{ role: 'user', content: [{ type: 'text', text: 'Task: x' }] }];
+      expect(buildGeminiRequest('SYSTEM', TOOLS, msgs, 'low').generationConfig?.thinkingConfig.thinkingLevel)
+        .assertEqual('LOW');
+      expect(buildGeminiRequest('SYSTEM', TOOLS, msgs, 'none').generationConfig).assertUndefined();
+      expect(buildGeminiRequest('SYSTEM', TOOLS, msgs).generationConfig).assertUndefined();
+    });
+
     it('parses function calls, thoughts and signatures', 0, () => {
       const r = parseGeminiResponse('{"candidates":[{"finishReason":"STOP","content":{"role":"model","parts":[' +
         '{"text":"thinking about it","thought":true},' +

@@ -45,6 +45,10 @@ class FakeExecutor implements Executor {
     return `[${index}] Fake`;
   }
 
+  appLabel(bundleName: string): string {
+    return bundleName === 'com.ohos.mms' ? 'Messages' : '';
+  }
+
   click(index: number): Promise<void> {
     if (index >= this.screenItems) {
       return Promise.reject(new Error(`Index ${index} is not on the current screen`));
@@ -75,9 +79,11 @@ class FakeExecutor implements Executor {
 
 class RecordingListener implements AgentListener {
   kinds: string[] = [];
+  texts: string[] = [];
 
   log(kind: string, text: string): void {
     this.kinds.push(kind);
+    this.texts.push(text);
   }
 }
 
@@ -208,6 +214,16 @@ export default function agentLoopTest() {
       const result = await s[3].run('task');
       expect(result.success).assertFalse();
       expect(result.summary).assertContain('API key was rejected');
+    });
+
+    it('logs steps as plain sentences', 0, async () => {
+      const s = setup();
+      s[0].responses = [
+        reply('tool_use', [toolUse('t1', 'launch_app', { 'bundle_name': 'com.ohos.mms' })]),
+        finish('t2')
+      ];
+      await s[3].run('text grandma');
+      expect(s[2].texts).assertContain('Open Messages');
     });
 
     it('can be stopped by the user', 0, async () => {

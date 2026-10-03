@@ -1,9 +1,9 @@
 /**
- * User settings (AI provider, model, one API key per provider) in app-private
- * Preferences. Both the UI process and the accessibility-extension process read
- * the same store; the extension drops its in-memory cache first so it always sees
- * the latest saved values. A key never leaves the app sandbox except in the HTTPS
- * request to its own provider.
+ * User settings (AI provider, model, reasoning effort, one API key per provider,
+ * floating orb switch) in app-private Preferences. The UI, the overlay and the
+ * accessibility-extension process all read the same store; the other processes
+ * drop their in-memory cache first so they always see the latest saved values.
+ * A key never leaves the app sandbox except in the HTTPS request to its own provider.
  */
 import { Context } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
@@ -12,6 +12,7 @@ import { PROVIDER_ANTHROPIC, PROVIDERS } from '../agent/Providers';
 const STORE = 'settings';
 const KEY_PROVIDER = 'provider';
 const KEY_MODEL = 'model';
+const KEY_EFFORT = 'effort';
 const KEY_API_KEY_PREFIX = 'apiKey.';
 /** single key of versions that only supported Anthropic */
 const LEGACY_KEY_API_KEY = 'apiKey';
@@ -21,6 +22,8 @@ export interface AgentSettings {
   model: string;
   /** API key of `provider` */
   apiKey: string;
+  /** reasoning effort; '' = the model's default */
+  effort: string;
 }
 
 function store(ctx: Context, dropCache: boolean): preferences.Preferences {
@@ -44,7 +47,8 @@ export function loadSettings(ctx: Context, dropCache: boolean): AgentSettings {
   return {
     provider: provider,
     model: prefs.getSync(KEY_MODEL, PROVIDERS[0].models[0].id) as string,
-    apiKey: apiKeyFrom(prefs, provider)
+    apiKey: apiKeyFrom(prefs, provider),
+    effort: prefs.getSync(KEY_EFFORT, '') as string
   };
 }
 
@@ -62,6 +66,25 @@ export async function saveSettings(ctx: Context, settings: AgentSettings): Promi
   const prefs = store(ctx, false);
   prefs.putSync(KEY_PROVIDER, settings.provider);
   prefs.putSync(KEY_MODEL, settings.model);
+  prefs.putSync(KEY_EFFORT, settings.effort);
   prefs.putSync(KEY_API_KEY_PREFIX + settings.provider, settings.apiKey.trim());
+  await prefs.flush();
+}
+
+const KEY_SHOW_ORB = 'showOrb';
+
+/** AppStorage key: true while the agent service is enabled (written by Index, shown in Settings). */
+export const KEY_SERVICE_READY = 'serviceReady';
+/** ServiceExtensionAbility that owns the floating orb, sheet and pill. */
+export const OVERLAY_ABILITY = 'OverlayService';
+
+/** Whether the floating orb is shown over other apps (default on). */
+export function loadShowOrb(ctx: Context): boolean {
+  return store(ctx, false).getSync(KEY_SHOW_ORB, true) as boolean;
+}
+
+export async function saveShowOrb(ctx: Context, on: boolean): Promise<void> {
+  const prefs = store(ctx, false);
+  prefs.putSync(KEY_SHOW_ORB, on);
   await prefs.flush();
 }

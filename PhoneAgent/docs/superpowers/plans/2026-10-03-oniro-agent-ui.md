@@ -32,11 +32,14 @@ Effort per model (checked 2026-10-03; re-check the OpenAI/xAI/Gemini docs with C
 |---|---|---|
 | Claude Opus 5.5, Claude Sonnet 5.5 | `output_config.effort` | low, medium, high, xhigh, max (Default = `medium`, as today) |
 | Claude Haiku 4.5 | none (effort is rejected) | – |
-| OpenAI GPT-5, GPT-5 mini | `reasoning_effort` | minimal, low, medium, high |
-| xAI Grok 3 mini | `reasoning_effort` | low, high |
-| xAI Grok 4 | none (rejects `reasoning_effort`) | – |
-| Gemini 2.5 Pro | `generationConfig.thinkingConfig.thinkingBudget` | low 1024, medium 8192, high 24576 (Pro cannot turn thinking off) |
-| Gemini 2.5 Flash | same | none 0, low 1024, medium 8192, high 24576 |
+| OpenAI GPT-5.5 | `reasoning_effort` | none, low, medium, high, xhigh |
+| OpenAI GPT-5.6 Terra, GPT-5.6 Luna | `reasoning_effort` | none, low, medium, high, xhigh, max |
+| xAI Grok 4.7 | `reasoning_effort` | low, medium, high, xhigh |
+| xAI Grok 4.3 | none (not listed as supporting it) | – |
+| Gemini 3.8 Flash, Gemini 3.1 Pro (preview) | `generationConfig.thinkingConfig.thinkingLevel` | low, medium, high (enum `LOW`…) |
+| Gemini 3.5 Flash-Lite | same | minimal, low, medium, high |
+
+Re-checked 2026-10-04 (Task 6b Step 2) against the providers' docs: the suggested models moved on (GPT-5/5 mini, Grok 4/3 mini and Gemini 2.5 are no longer the listed models), Gemini 3+ takes `thinkingLevel` (a `thinkingLevel` on 2.5 models is an error), and OpenAI's GPT-6 Astra / 6.1 Sol only support function calling through the Responses API, so they are not suggested for the Chat Completions client.
 
 ## Global Constraints
 

@@ -1,5 +1,5 @@
 /**
- * Phone Agent service: an AccessibilityExtensionAbility that hosts the agent loop.
+ * Oniro Agent service: an AccessibilityExtensionAbility that hosts the agent loop.
  * Runs in its own process and stays connected while other apps are in the
  * foreground, which is where the agent has to read and operate the UI.
  */
@@ -16,6 +16,7 @@ import {
   EVT_STOP,
   EVT_SYNC,
   LogEntry,
+  ORIGIN_OVERLAY,
   OWN_BUNDLE,
   publishEvent,
   RunRequest,
@@ -169,11 +170,12 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
       }
       const apiKey = loadApiKey(this.context, provider.id, true);
       if (apiKey.length === 0) {
-        this.addLog(LOG_ERROR, `No ${provider.label} API key set. Enter it in Phone Agent first.`);
+        this.addLog(LOG_ERROR, `No ${provider.label} API key set. Add it in Oniro Agent Settings.`);
         return;
       }
       try {
-        llm = createLlm(provider.id, apiKey, typeof req.model === 'string' ? req.model.trim() : '');
+        llm = createLlm(provider.id, apiKey, typeof req.model === 'string' ? req.model.trim() : '',
+          typeof req.effort === 'string' ? req.effort : '');
       } catch (e) {
         this.addLog(LOG_ERROR, (e as Error).message);
         return;
@@ -193,7 +195,10 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
       this.publishStatus(true, this.entries);
     }
     // Leave the result visible in the target app for a moment, then show the log.
-    setTimeout(() => this.showUi(), RETURN_TO_UI_DELAY_MS);
+    // Overlay runs show the result in the pill instead and leave the user where they are.
+    if (req.origin !== ORIGIN_OVERLAY) {
+      setTimeout(() => this.showUi(), RETURN_TO_UI_DELAY_MS);
+    }
   }
 
   private showUi(): void {

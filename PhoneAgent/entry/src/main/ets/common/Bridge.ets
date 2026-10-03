@@ -18,12 +18,23 @@ export const EVT_STOP = 'com.hackyeah.phoneagent.STOP';
 export const EVT_SYNC = 'com.hackyeah.phoneagent.SYNC';
 /** service -> UI: log entries (data: AgentStatus JSON) */
 export const EVT_STATUS = 'com.hackyeah.phoneagent.STATUS';
+/** EntryAbility -> overlay: the app window went to the foreground ('1') or background ('0') */
+export const EVT_UI_VISIBLE = 'com.hackyeah.phoneagent.UI_VISIBLE';
+
+export const ORIGIN_APP = 'app';
+export const ORIGIN_OVERLAY = 'overlay';
+/** the stock navigation bar; the only other app allowed to open the overlay (long-press Home) */
+export const SYSTEMUI_BUNDLE = 'com.ohos.systemui';
 
 export interface RunRequest {
   task: string;
   /** provider id, see agent/Providers.ets */
   provider: string;
   model: string;
+  /** reasoning effort; '' or missing = the model's default */
+  effort?: string;
+  /** who started the task: ORIGIN_APP (default) or ORIGIN_OVERLAY; overlay runs do not reopen the app */
+  origin?: string;
 }
 
 export interface LogEntry {

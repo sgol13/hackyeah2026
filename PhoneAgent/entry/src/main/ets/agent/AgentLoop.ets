@@ -9,6 +9,7 @@
  */
 import { ApiMessage, ContentBlock, MessagesResponse } from './Anthropic';
 import { LlmError } from './Http';
+import { stepText } from './StepText';
 import {
   parseToolCall,
   TOOL_CLICK,
@@ -30,6 +31,8 @@ export interface Executor {
   readScreen(): Promise<string>;
   /** Human-readable line for an element of the last screen ('' if unknown). */
   describeElement(index: number): string;
+  /** Launcher label of an installed app ('' if unknown). */
+  appLabel(bundleName: string): string;
   click(index: number): Promise<void>;
   typeText(index: number, text: string): Promise<void>;
   scroll(index: number, down: boolean): Promise<void>;
@@ -223,25 +226,9 @@ export class AgentLoop {
   }
 
   private describe(a: ToolAction): string {
-    const el = a.index >= 0 ? this.exec.describeElement(a.index) : '';
-    switch (a.name) {
-      case TOOL_LIST_APPS:
-        return 'List apps';
-      case TOOL_LAUNCH_APP:
-        return `Open ${a.bundleName}`;
-      case TOOL_READ_SCREEN:
-        return 'Read screen';
-      case TOOL_CLICK:
-        return `Tap ${el.length > 0 ? el : '[' + a.index + ']'}`;
-      case TOOL_TYPE_TEXT:
-        return `Type "${a.text}" into ${el.length > 0 ? el : '[' + a.index + ']'}`;
-      case TOOL_SCROLL:
-        return `Scroll ${a.scrollDown ? 'down' : 'up'} ${el.length > 0 ? el : '[' + a.index + ']'}`;
-      case TOOL_PRESS_KEY:
-        return `Press ${a.key}`;
-      default:
-        return a.name;
-    }
+    const line = a.index >= 0 ? this.exec.describeElement(a.index) : '';
+    const app = a.name === TOOL_LAUNCH_APP ? this.exec.appLabel(a.bundleName) : '';
+    return stepText(a, app, line);
   }
 
   private async afterAction(prefix: string): Promise<string> {

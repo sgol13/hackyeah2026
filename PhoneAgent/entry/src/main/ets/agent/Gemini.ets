@@ -74,11 +74,21 @@ export interface GmSystemInstruction {
   parts: GmPart[];
 }
 
+export interface GmThinkingConfig {
+  /** MINIMAL / LOW / MEDIUM / HIGH; Gemini 3 and later (older models reject it) */
+  thinkingLevel: string;
+}
+
+export interface GmGenerationConfig {
+  thinkingConfig: GmThinkingConfig;
+}
+
 export interface GmRequest {
   systemInstruction: GmSystemInstruction;
   contents: GmContent[];
   tools: GmTool[];
   toolConfig: GmToolConfig;
+  generationConfig?: GmGenerationConfig;
 }
 
 interface GmCandidate {
@@ -195,13 +205,25 @@ export function toGeminiContents(messages: ApiMessage[]): GmContent[] {
   return out;
 }
 
-export function buildGeminiRequest(system: string, tools: ToolDef[], messages: ApiMessage[]): GmRequest {
-  return {
+/** effort level -> ThinkingLevel enum (Gemini 3 and later; the 2.5 models used a token budget instead) */
+export const GEMINI_THINKING_LEVEL: Record<string, string> = {
+  'minimal': 'MINIMAL', 'low': 'LOW', 'medium': 'MEDIUM', 'high': 'HIGH'
+};
+
+/** `effort` ("low", ...) becomes the thinking level; '' or an unknown level leaves the model's default. */
+export function buildGeminiRequest(system: string, tools: ToolDef[], messages: ApiMessage[],
+  effort: string = ''): GmRequest {
+  const req: GmRequest = {
     systemInstruction: { parts: [{ text: system }] },
     contents: toGeminiContents(messages),
     tools: toGeminiTools(tools),
     toolConfig: { functionCallingConfig: { mode: 'AUTO' } }
   };
+  const level = GEMINI_THINKING_LEVEL[effort];
+  if (level !== undefined) {
+    req.generationConfig = { thinkingConfig: { thinkingLevel: level } };
+  }
+  return req;
 }
 
 // ---------- responses ----------
@@ -298,11 +320,13 @@ function handleResponse(resp: HttpResponse): MessagesResponse {
 export class GeminiClient implements ChatClient {
   private apiKey: string;
   private model: string;
+  private effort: string;
 
-  constructor(apiKey: string, model: string) {
+  constructor(apiKey: string, model: string, effort: string = '') {
     this.apiKey = apiKey;
     // accept "models/gemini-..." as well as "gemini-..."
     this.model = model.startsWith('models/') ? model.substring('models/'.length) : model;
+    this.effort = effort;
   }
 
   createMessage(system: string, tools: ToolDef[], messages: ApiMessage[]): Promise<MessagesResponse> {
@@ -311,7 +335,7 @@ export class GeminiClient implements ChatClient {
       'content-type': 'application/json',
       'x-goog-api-key': this.apiKey
     };
-    const body = JSON.stringify(buildGeminiRequest(system, tools, messages));
+    const body = JSON.stringify(buildGeminiRequest(system, tools, messages, this.effort));
     return postWithRetry<MessagesResponse>(url, headers, body, handleResponse);
   }
 }

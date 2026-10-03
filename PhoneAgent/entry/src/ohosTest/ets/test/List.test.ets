@@ -2,8 +2,13 @@ import agentLoopTest from './AgentLoop.test';
 import anthropicTest from './Anthropic.test';
 import geminiTest from './Gemini.test';
 import openAiCompatTest from './OpenAiCompat.test';
+import orbGeometryTest from './OrbGeometry.test';
 import providersTest from './Providers.test';
+import runCheckTest from './RunCheck.test';
 import screenTextTest from './ScreenText.test';
+import statusTrackerTest from './StatusTracker.test';
+import stepTextTest from './StepText.test';
+import timelineTest from './Timeline.test';
 import toolsTest from './Tools.test';
 
 export default function testsuite() {
@@ -14,4 +19,9 @@ export default function testsuite() {
   geminiTest();
   providersTest();
   agentLoopTest();
+  stepTextTest();
+  statusTrackerTest();
+  timelineTest();
+  runCheckTest();
+  orbGeometryTest();
 }

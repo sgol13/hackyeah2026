@@ -2,6 +2,9 @@ import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.Ab
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import BuildProfile from 'BuildProfile';
+import { EVT_UI_VISIBLE, OWN_BUNDLE, publishEvent } from '../common/Bridge';
+import { registerFonts } from '../common/Fonts';
+import { loadShowOrb, OVERLAY_ABILITY } from '../common/Settings';
 
 const DOMAIN = 0x0000;
 
@@ -34,17 +37,35 @@ export default class EntryAbility extends UIAbility {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
     takeLaunchParams(want);
+    if (loadShowOrb(this.context)) {
+      const overlay: Want = { bundleName: OWN_BUNDLE, abilityName: OVERLAY_ABILITY, parameters: { 'fromApp': true } };
+      this.context.startServiceExtensionAbility(overlay).catch((err: Error) => {
+        hilog.warn(DOMAIN, 'testTag', 'overlay not started: %{public}s', err.message);
+      });
+    }
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     takeLaunchParams(want);
   }
 
+  onForeground(): void {
+    publishEvent(EVT_UI_VISIBLE, '1').catch(() => {
+    });
+  }
+
+  onBackground(): void {
+    publishEvent(EVT_UI_VISIBLE, '0').catch(() => {
+    });
+  }
+
   onWindowStageCreate(windowStage: window.WindowStage): void {
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
+        return;
       }
+      registerFonts(windowStage.getMainWindowSync().getUIContext());
     });
   }
 }

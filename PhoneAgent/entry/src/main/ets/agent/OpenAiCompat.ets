@@ -52,6 +52,8 @@ export interface OaRequest {
   messages: OaMessage[];
   tools: OaTool[];
   tool_choice: string;
+  /** OpenAI and xAI both take reasoning_effort in Chat Completions */
+  reasoning_effort?: string;
 }
 
 interface OaChoice {
@@ -118,9 +120,16 @@ export function toOpenAiMessages(system: string, messages: ApiMessage[]): OaMess
   return out;
 }
 
+/** `effort` '' leaves reasoning_effort out (model default / models without the setting). */
 export function buildOpenAiRequest(model: string, system: string, tools: ToolDef[],
-  messages: ApiMessage[]): OaRequest {
-  return { model: model, messages: toOpenAiMessages(system, messages), tools: toOpenAiTools(tools), tool_choice: 'auto' };
+  messages: ApiMessage[], effort: string = ''): OaRequest {
+  const req: OaRequest = {
+    model: model, messages: toOpenAiMessages(system, messages), tools: toOpenAiTools(tools), tool_choice: 'auto'
+  };
+  if (effort.length > 0) {
+    req.reasoning_effort = effort;
+  }
+  return req;
 }
 
 // ---------- responses ----------
@@ -227,11 +236,13 @@ export class OpenAiCompatClient implements ChatClient {
   private url: string;
   private apiKey: string;
   private model: string;
+  private effort: string;
 
-  constructor(url: string, apiKey: string, model: string) {
+  constructor(url: string, apiKey: string, model: string, effort: string = '') {
     this.url = url;
     this.apiKey = apiKey;
     this.model = model;
+    this.effort = effort;
   }
 
   createMessage(system: string, tools: ToolDef[], messages: ApiMessage[]): Promise<MessagesResponse> {
@@ -239,7 +250,7 @@ export class OpenAiCompatClient implements ChatClient {
       'content-type': 'application/json',
       'authorization': `Bearer ${this.apiKey}`
     };
-    const body = JSON.stringify(buildOpenAiRequest(this.model, system, tools, messages));
+    const body = JSON.stringify(buildOpenAiRequest(this.model, system, tools, messages, this.effort));
     return postWithRetry<MessagesResponse>(this.url, headers, body, handleResponse);
   }
 }

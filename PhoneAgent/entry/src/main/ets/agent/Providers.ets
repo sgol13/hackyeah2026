@@ -3,8 +3,13 @@
  * through the Llm interface; each client translates the loop's conversation
  * format to its API. Anthropic is verified end to end on the device; OpenAI,
  * xAI and Gemini are implemented against their public API docs and unit-tested.
+ *
+ * Suggested models and their reasoning-effort levels follow the providers' docs
+ * (checked 2026-10-04). The OpenAI client uses Chat Completions with function
+ * tools, so OpenAI models that only take tools through the Responses API
+ * (GPT-6 Astra, GPT-6.1 Sol; GPT-6 Luna unless effort is "none") are not suggested.
  */
-import { AnthropicClient, ApiMessage, ChatClient, findModel, MessagesResponse } from './Anthropic';
+import { AnthropicClient, ApiMessage, ChatClient, findModel, MessagesResponse, ModelOption } from './Anthropic';
 import { Llm } from './AgentLoop';
 import { GeminiClient } from './Gemini';
 import { OPENAI_CHAT_URL, OpenAiCompatClient, XAI_CHAT_URL } from './OpenAiCompat';
@@ -19,6 +24,8 @@ export const PROVIDER_GEMINI = 'gemini';
 export interface ModelChoice {
   id: string;
   label: string;
+  /** reasoning effort levels the model accepts, lowest first; [] = no effort setting */
+  efforts: string[];
 }
 
 export interface ProviderInfo {
@@ -30,34 +37,40 @@ export interface ProviderInfo {
   models: ModelChoice[];
 }
 
+const CLAUDE_EFFORTS: string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+const GPT_EFFORTS: string[] = ['none', 'low', 'medium', 'high', 'xhigh'];
+const GPT56_EFFORTS: string[] = ['none', 'low', 'medium', 'high', 'xhigh', 'max'];
+
 export const PROVIDERS: ProviderInfo[] = [
   {
     id: PROVIDER_ANTHROPIC, label: 'Anthropic Claude', keyHint: 'Anthropic API key (sk-ant-...)',
     models: [
-      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
-      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
-      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' }
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', efforts: CLAUDE_EFFORTS },
+      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', efforts: CLAUDE_EFFORTS },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', efforts: [] }
     ]
   },
   {
     id: PROVIDER_OPENAI, label: 'OpenAI', keyHint: 'OpenAI API key (sk-...)',
     models: [
-      { id: 'gpt-5', label: 'GPT-5' },
-      { id: 'gpt-5-mini', label: 'GPT-5 mini' }
+      { id: 'gpt-5.5', label: 'GPT-5.5', efforts: GPT_EFFORTS },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', efforts: GPT56_EFFORTS },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', efforts: GPT56_EFFORTS }
     ]
   },
   {
     id: PROVIDER_XAI, label: 'xAI Grok', keyHint: 'xAI API key (xai-...)',
     models: [
-      { id: 'grok-4', label: 'Grok 4' },
-      { id: 'grok-3-mini', label: 'Grok 3 mini' }
+      { id: 'grok-4.7', label: 'Grok 4.7', efforts: ['low', 'medium', 'high', 'xhigh'] },
+      { id: 'grok-4.3', label: 'Grok 4.3', efforts: [] }
     ]
   },
   {
     id: PROVIDER_GEMINI, label: 'Google Gemini', keyHint: 'Gemini API key (AIza...)',
     models: [
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }
+      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', efforts: ['low', 'medium', 'high'] },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (preview)', efforts: ['low', 'medium', 'high'] },
+      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', efforts: ['minimal', 'low', 'medium', 'high'] }
     ]
   }
 ];
@@ -69,6 +82,40 @@ export function findProvider(id: string): ProviderInfo | undefined {
 /** Model IDs end up in URLs (Gemini), so only allow plain identifier characters. */
 export function isValidModelId(id: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._:\/-]{0,99}$/.test(id);
+}
+
+/** Display label of a model: the suggested model's label, or the custom ID itself. */
+export function modelLabel(providerId: string, modelId: string): string {
+  const m = findProvider(providerId)?.models.find((c: ModelChoice) => c.id === modelId);
+  return m === undefined ? modelId : m.label;
+}
+
+const EFFORT_LABELS: Record<string, string> = {
+  'none': 'Off', 'minimal': 'Minimal', 'low': 'Low', 'medium': 'Medium', 'high': 'High', 'xhigh': 'Extra high', 'max': 'Max'
+};
+
+/** Effort levels of a suggested model; [] for models without one and for custom model IDs. */
+export function effortsFor(providerId: string, modelId: string): string[] {
+  const m = findProvider(providerId)?.models.find((c: ModelChoice) => c.id === modelId);
+  return m === undefined ? [] : m.efforts;
+}
+
+/** '' (not set) shows as 'Default'. */
+export function effortLabel(effort: string): string {
+  return effort.length === 0 ? 'Default' : (EFFORT_LABELS[effort] ?? effort);
+}
+
+/** The Anthropic model options with the chosen effort; '' or an unsupported effort keeps the model's default. */
+export function anthropicModelOption(modelId: string, effort: string): ModelOption {
+  const base = findModel(modelId);
+  const usable = base.effort !== undefined && effortsFor(PROVIDER_ANTHROPIC, modelId).indexOf(effort) >= 0;
+  return { id: base.id, label: base.label, effort: usable ? effort : base.effort, fallbacks: base.fallbacks };
+}
+
+/** Model chip text: "Claude Opus 5.5, high effort", or just the model when the effort is the default. */
+export function modelSummary(providerId: string, modelId: string, effort: string): string {
+  const model = modelLabel(providerId, modelId);
+  return effort.length > 0 ? `${model}, ${effortLabel(effort).toLowerCase()} effort` : model;
 }
 
 class AnthropicLlm implements Llm {
@@ -95,20 +142,24 @@ class ChatClientLlm implements Llm {
   }
 }
 
-/** Creates the model client for a provider; throws on an unknown provider or invalid model ID. */
-export function createLlm(provider: string, apiKey: string, model: string): Llm {
+/**
+ * Creates the model client for a provider; throws on an unknown provider or invalid model ID.
+ * An effort the model does not list is ignored, so stale settings never cause a 400.
+ */
+export function createLlm(provider: string, apiKey: string, model: string, effort: string = ''): Llm {
   if (!isValidModelId(model)) {
     throw new Error(`Invalid model ID "${model}"`);
   }
+  const e = effortsFor(provider, model).indexOf(effort) >= 0 ? effort : '';
   switch (provider) {
     case PROVIDER_ANTHROPIC:
-      return new AnthropicLlm(new AnthropicClient(apiKey, findModel(model)));
+      return new AnthropicLlm(new AnthropicClient(apiKey, anthropicModelOption(model, e)));
     case PROVIDER_OPENAI:
-      return new ChatClientLlm(new OpenAiCompatClient(OPENAI_CHAT_URL, apiKey, model));
+      return new ChatClientLlm(new OpenAiCompatClient(OPENAI_CHAT_URL, apiKey, model, e));
     case PROVIDER_XAI:
-      return new ChatClientLlm(new OpenAiCompatClient(XAI_CHAT_URL, apiKey, model));
+      return new ChatClientLlm(new OpenAiCompatClient(XAI_CHAT_URL, apiKey, model, e));
     case PROVIDER_GEMINI:
-      return new ChatClientLlm(new GeminiClient(apiKey, model));
+      return new ChatClientLlm(new GeminiClient(apiKey, model, e));
     default:
       throw new Error(`Unknown AI provider "${provider}"`);
   }
