@@ -1,10 +1,9 @@
 {
   "app": {
-    "bundleName": "com.example.phoneagent",
-    "vendor": "example",
+    "bundleName": "com.hackyeah.phoneagent",
+    "vendor": "phoneagent",
     "versionCode": 1000000,
     "versionName": "1.0.0",
-    "buildVersion": "1",
     "icon": "$media:layered_image",
     "label": "$string:app_name"
   }
