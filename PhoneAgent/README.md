@@ -8,6 +8,61 @@ AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gem
 - [AI_WORKFLOW.md](AI_WORKFLOW.md)
 - Demo video: _(link on submission)_
 
+## At a glance
+
+### Originality
+- Phone agent that works in **any app** through accessibility, with no per-app integrations.
+- Reads the screen as **text** (accessibility tree), not screenshots. Needs no vision model.
+- Ships as a **system component** we built and signed ourselves, without modifying the OS.
+- Combines **Intelligent Experiences** (AI agent) and **Human-Centric Technology** (accessibility).
+
+### Usefulness
+- **For:** people who struggle with multi-step phone UIs (older people, motor or vision impairments, busy hands).
+- **Problem:** "text grandma I'll come" takes 6 steps (app → new message → contact picker → contact → text → Send). Here it takes one sentence.
+- **Works today (narrow):** SMS via Messages 3/3 runs, 6 actions, ~31 s each. Settings → WLAN in 2 actions, Bluetooth on/off. (Claude models, emulator, 3 Oct.)
+- Works from inside any app via the floating orb.
+
+### Technical execution
+- Architecture with diagram: [ARCHITECTURE.md](ARCHITECTURE.md). Agent loop, providers, device access and UI are separate modules, behind interfaces.
+- **Error handling:**
+
+  | What | Behaviour |
+  |---|---|
+  | API retries | max 3, only 429 / 5xx / network; backoff 1 → 2 → 4 s; `Retry-After` honoured up to 60 s |
+  | Timeouts | connect 30 s, read 180 s |
+  | 401 / 403 / 404 / billing | no retry, plain-language message ("API key was rejected…") |
+  | Bad model output | every tool call validated (types, index range, enums, text ≤ 2000 chars, bundle name); errors go back to the model, nothing executed |
+  | Failed action | error + current screen sent back so the model can recover |
+  | Refusal / cut-off reply | nothing executed, task ends |
+  | Model answers without a tool | 1 nudge, then stop |
+  | Stuck | 4 actions in a row with no screen change → stop |
+  | Limits | 25 model calls per task; screen ≤ 150 elements, texts ≤ 80 chars |
+  | Stop | immediate, even during a pending model call |
+  | Agent service not responding | pinged before each task, restarted if silent (8 s ping, 5 s ack) |
+- **Tests:** 81 on-device hypium tests: tool validation, malformed / refused / truncated responses, API errors of all 4 providers, agent loop with a scripted model, screen serializer.
+- **Hygiene:** no secrets in the repo (keys stored in app-private storage, signing material generated locally and git-ignored). 6 permissions, each one used. 0 runtime dependencies, no vendor SDKs.
+
+### Platform capabilities
+| OpenHarmony API | Used for |
+|---|---|
+| `AccessibilityExtensionAbility` | read and operate other apps, in the background |
+| `accessibility config.enableAbility` | switch the agent on from the app |
+| `launcherBundleManager` + `startAbility` from background | find and open apps |
+| `TYPE_FLOAT` windows + `ServiceExtensionAbility` | orb, status pill and edge glow over all apps |
+| Common events | UI ↔ agent service ↔ overlay |
+| `system_core` signing | the above without modifying the OS |
+
+Does not run unchanged on any other OS.
+
+### Demo
+- Runs on the Oniro 6.1 emulator, not mockups.
+- Everything here was built during the hackathon (first commit 3 Oct, 17:25).
+- **Not on the emulator:** no SIM, so the SMS is not delivered. The agent taps Send and reports that sending could not be confirmed. No Bluetooth adapter either.
+
+### Reproducibility
+- Exact versions and step-by-step setup below. Native Windows, no WSL. Scripts start the emulator, build, sign, install and test.
+- Commit history shows the progress. AI usage, prompts and lessons: [AI_WORKFLOW.md](AI_WORKFLOW.md).
+
 ## Versions
 
 Windows 11 · QEMU 11.1.0 for Windows (WHPX) · Oniro emulator v6.1 · DevEco Studio 6.1.1.280 · OpenHarmony full SDK 6.0.0.48 (API 20)
@@ -103,7 +158,7 @@ With the emulator running:
 
 The first build installs OHPM dependencies automatically, builds the agent and creates its signing material in `.signing`. Public OpenHarmony test certificates and the system-app profile template are included in `signing/`; you do not need a Huawei account or personal signing certificate for this Oniro image. Keep `.signing` for subsequent updates. A new checkout on another computer creates a different app certificate; installing over a copy signed elsewhere may require uninstalling that copy first, which deletes its local settings and skills. Builds using the same signing material can update in place.
 
-The scripts install and launch **Oniro Agent**, **Calendar**, **Notes**, and **Reminders**. Grant Calendar access when asked. The Oniro image already includes Contacts and Messages; the Notes companion exposes note bodies to accessibility, and Reminders schedules actual system notifications. Open Oniro Agent, then **Settings → AI provider → API key → model**. Enter your own provider key; keys are not included in the repository. The app enables its accessibility service and shows **Agent service on**. The test suite requires the emulator but does not call paid AI APIs; a successful run reports **Pass: 102**.
+The scripts install and launch **Oniro Agent**, **Calendar**, **Notes**, and **Reminders**. Grant Calendar access when asked. The Oniro image already includes Contacts and Messages; the Notes companion exposes note bodies to accessibility, and Reminders schedules actual system notifications. Open Oniro Agent, then **Settings → AI provider → API key → model**. Enter your own provider key; keys are not included in the repository. The app enables its accessibility service and shows **Agent service on**. The test suite requires the emulator but does not call paid AI APIs; a successful run reports **Pass: 106**.
 
 Each build script accepts `-NoInstall` for build-only output. Signed HAPs are written to `build\phoneagent-signed.hap`, `build\calendar-signed.hap`, `build\notes-signed.hap`, and `build\reminders-signed.hap`. These system-app signatures target the Oniro/OpenHarmony test image; commercial HarmonyOS phones require different signing and permissions.
 
@@ -174,7 +229,7 @@ Calendar date validation checks (using DevEco's bundled Node and the full SDK):
 
 ## Check
 
-- Tests: `.\scripts\test.ps1` → `Pass: 102`
+- Tests: `.\scripts\test.ps1` → `Pass: 106`
 - Screenshot: `.\scripts\screenshot.ps1 -Name main` → `build\shots\main.jpeg`
 - System app: `hdc shell "bm dump -n com.hackyeah.phoneagent" | findstr appPrivilegeLevel` → `system_core`
 - Log: `hdc shell "hilog -x" | findstr AgentA11y`

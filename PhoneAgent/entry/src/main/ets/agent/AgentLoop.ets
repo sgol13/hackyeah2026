@@ -70,6 +70,10 @@ export interface AgentResult {
 const DEFAULT_MAX_STEPS = 25;
 const MAX_NUDGES = 1;
 const NUDGE_TEXT = 'Continue the task using the tools. When it is complete (or impossible), call finish.';
+/** Consecutive actions that leave the screen unchanged before the agent gives up (saves model calls when stuck). */
+const MAX_NO_EFFECT_ACTIONS = 4;
+const NO_EFFECT_NOTE = 'Note: the screen did not change after this action. Do not repeat it; try something else ' +
+  '(another element, scrolling, going back) or call finish.';
 
 function textBlock(text: string): ContentBlock {
   return { type: 'text', text: text };
@@ -124,10 +128,12 @@ export class AgentLoop {
   private maxSteps: number;
   private skills: UserSkill[];
   private stopped: boolean = false;
-  /** resolves when stop() is called, so a pending model call is abandoned right away */
-  private stopSignal: Promise<undefined>;
-  private signalStop: () => void = () => {
-  };
+  /** Resolves when stop() is called, so Stop does not wait for a slow model call or its retries. */
+  private stopSignal: Promise<void>;
+  private resolveStop: () => void = () => {};
+  /** The screen the model saw last, to tell it when an action changed nothing. */
+  private lastScreen: string = '';
+  private noEffectActions: number = 0;
 
   constructor(llm: Llm, exec: Executor, listener: AgentListener, maxSteps: number = DEFAULT_MAX_STEPS,
     skills: UserSkill[] = []) {
@@ -136,15 +142,22 @@ export class AgentLoop {
     this.listener = listener;
     this.maxSteps = maxSteps;
     this.skills = enabledSkills(skills);
-    this.stopSignal = new Promise<undefined>((resolve) => {
-      this.signalStop = () => resolve(undefined);
+    this.stopSignal = new Promise<void>((resolve) => {
+      this.resolveStop = resolve;
     });
   }
 
   /** Stops the task now: a model call in progress is abandoned and no further action is executed. */
   stop(): void {
     this.stopped = true;
-    this.signalStop();
+    this.resolveStop();
+  }
+
+  /** The model's next response, or undefined if the user stopped the task while waiting for it. */
+  private ask(messages: ApiMessage[]): Promise<MessagesResponse | undefined> {
+    const answer = this.llm.send(messages).then((r: MessagesResponse): MessagesResponse | undefined => r);
+    const stopped = this.stopSignal.then((): MessagesResponse | undefined => undefined);
+    return Promise.race([answer, stopped]);
   }
 
   private end(success: boolean, summary: string, steps: number): AgentResult {
@@ -168,14 +181,9 @@ export class AgentLoop {
       if (this.stopped) {
         return this.end(false, 'Stopped by the user.', step - 1);
       }
-      let resp: MessagesResponse;
+      let answer: MessagesResponse | undefined;
       try {
-        const pending: Promise<MessagesResponse | undefined>[] = [this.llm.send(messages), this.stopSignal];
-        const answer: MessagesResponse | undefined = await Promise.race(pending);
-        if (answer === undefined || this.stopped) {
-          return this.end(false, 'Stopped by the user.', step - 1);
-        }
-        resp = answer;
+        answer = await this.ask(messages);
       } catch (e) {
         if (this.stopped) {
           return this.end(false, 'Stopped by the user.', step - 1);
@@ -183,6 +191,10 @@ export class AgentLoop {
         const msg = e instanceof LlmError ? describeApiError(e as LlmError) : errorMessage(e as Object);
         return this.end(false, msg, step - 1);
       }
+      if (answer === undefined || this.stopped) {
+        return this.end(false, 'Stopped by the user.', step - 1);
+      }
+      const resp: MessagesResponse = answer;
       // Append the full content (incl. thinking/fallback blocks) unchanged.
       messages.push({ role: 'assistant', content: resp.content });
       for (const b of resp.content) {
@@ -235,7 +247,7 @@ export class AgentLoop {
           this.listener.log(LOG_ERROR, msg);
           let screen = '';
           try {
-            screen = await this.exec.readScreen();
+            screen = await this.readScreen();
           } catch (e2) {
             screen = '(screen unavailable)';
           }
@@ -247,6 +259,9 @@ export class AgentLoop {
       if (finished !== undefined) {
         return finished;
       }
+      if (this.noEffectActions >= MAX_NO_EFFECT_ACTIONS) {
+        return this.end(false, `Stopped: the last ${this.noEffectActions} actions changed nothing on the screen.`, step);
+      }
     }
     return this.end(false, `Stopped after ${this.maxSteps} steps without finishing.`, this.maxSteps);
   }
@@ -257,9 +272,21 @@ export class AgentLoop {
     return stepText(a, app, line);
   }
 
+  private async readScreen(): Promise<string> {
+    this.lastScreen = await this.exec.readScreen();
+    return this.lastScreen;
+  }
+
   private async afterAction(prefix: string): Promise<string> {
     await this.exec.settle();
-    return `${prefix}\n${await this.exec.readScreen()}`;
+    const before = this.lastScreen;
+    const screen = await this.readScreen();
+    if (screen !== before) {
+      this.noEffectActions = 0;
+      return `${prefix}\n${screen}`;
+    }
+    this.noEffectActions++;
+    return `${prefix}\n${NO_EFFECT_NOTE}\n${screen}`;
   }
 
   private async execute(a: ToolAction): Promise<string> {
@@ -277,7 +304,7 @@ export class AgentLoop {
         await this.exec.launchApp(a.bundleName);
         return await this.afterAction(`Opened ${a.bundleName}. Screen:`);
       case TOOL_READ_SCREEN:
-        return await this.exec.readScreen();
+        return await this.readScreen();
       case TOOL_CLICK:
         await this.exec.click(a.index);
         return await this.afterAction(`Tapped [${a.index}]. New screen:`);

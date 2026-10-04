@@ -20,9 +20,16 @@ class FakeLlm implements Llm {
   responses: MessagesResponse[] = [];
   error: LlmError | undefined = undefined;
   requests: string[] = [];
+  /** never answer (a slow model call or one stuck in retries) */
+  hang: boolean = false;
+  onSend: () => void = () => {};
 
   send(messages: ApiMessage[]): Promise<MessagesResponse> {
     this.requests.push(JSON.stringify(messages));
+    this.onSend();
+    if (this.hang) {
+      return new Promise<MessagesResponse>(() => {});
+    }
     if (this.error !== undefined) {
       return Promise.reject(this.error);
     }
@@ -37,6 +44,8 @@ class FakeLlm implements Llm {
 class FakeExecutor implements Executor {
   actions: string[] = [];
   screenItems: number = 5;
+  /** what readScreen returns; typing changes it, clicks do not */
+  screen: string = 'App: com.ohos.mms\n[0] Text "New message" @130,64';
 
   listApps(): Promise<string> {
     return Promise.resolve('Messages (com.ohos.mms)\nSettings (com.ohos.settings)');
@@ -48,7 +57,7 @@ class FakeExecutor implements Executor {
   }
 
   readScreen(): Promise<string> {
-    return Promise.resolve('App: com.ohos.mms\n[0] Text "New message" @130,64');
+    return Promise.resolve(this.screen);
   }
 
   describeElement(index: number): string {
@@ -69,6 +78,7 @@ class FakeExecutor implements Executor {
 
   typeText(index: number, text: string): Promise<void> {
     this.actions.push(`type ${index} ${text}`);
+    this.screen += `\n[${index}] TextArea "${text}" (click,edit) @164,659`;
     return Promise.resolve();
   }
 
@@ -122,7 +132,11 @@ function lastToolResults(request: string): ContentBlock[] {
   return messages[messages.length - 1].content;
 }
 
-function setup(): [FakeLlm, FakeExecutor, RecordingListener, AgentLoop] {
+function hasNoEffectNote(request: string): boolean {
+  return (lastToolResults(request)[0].content ?? '').indexOf('did not change') >= 0;
+}
+
+function setup():[FakeLlm, FakeExecutor, RecordingListener, AgentLoop] {
   const llm = new FakeLlm();
   const exec = new FakeExecutor();
   const listener = new RecordingListener();
@@ -315,6 +329,59 @@ export default function agentLoopTest() {
       const result = await s[3].run('task');
       expect(result.summary).assertContain('Stopped');
       expect(s[0].requests.length).assertEqual(0);
+    });
+
+    it('stops at once while a model call is still pending', 0, async () => {
+      const s = setup();
+      s[0].hang = true;
+      s[0].onSend = () => s[3].stop();
+      const result = await s[3].run('task');
+      expect(result.success).assertFalse();
+      expect(result.summary).assertContain('Stopped by the user');
+      expect(s[0].requests.length).assertEqual(1);
+      expect(s[1].actions.length).assertEqual(0);
+    });
+
+    it('tells the model when an action changed nothing on the screen', 0, async () => {
+      const s = setup();
+      s[0].responses = [
+        reply('tool_use', [toolUse('t1', 'launch_app', { 'bundle_name': 'com.ohos.mms' })]),
+        reply('tool_use', [toolUse('t2', 'click', { 'index': 0 })]),
+        reply('tool_use', [toolUse('t3', 'type_text', { 'index': 0, 'text': 'Hi' })]),
+        finish('t4')
+      ];
+      await s[3].run('task');
+      expect(hasNoEffectNote(s[0].requests[1])).assertFalse(); // launch
+      expect(hasNoEffectNote(s[0].requests[2])).assertTrue(); // click, same screen
+      expect(hasNoEffectNote(s[0].requests[3])).assertFalse(); // typing changed the screen
+    });
+
+    it('gives up after repeated actions that change nothing', 0, async () => {
+      const s = setup();
+      for (let i = 0; i < 6; i++) {
+        s[0].responses.push(reply('tool_use', [toolUse(`t${i}`, 'click', { 'index': 0 })]));
+      }
+      const result = await s[3].run('task');
+      expect(result.success).assertFalse();
+      expect(result.summary).assertContain('changed nothing');
+      // the first click changes the (not yet seen) screen, the next 4 do not
+      expect(s[0].requests.length).assertEqual(5);
+    });
+
+    it('keeps going when the screen changes between ineffective actions', 0, async () => {
+      const s = setup();
+      const loop = new AgentLoop(s[0], s[1], s[2], 10);
+      s[0].responses = [
+        reply('tool_use', [toolUse('t1', 'launch_app', { 'bundle_name': 'com.ohos.mms' })]),
+        reply('tool_use', [toolUse('t2', 'click', { 'index': 0 })]),
+        reply('tool_use', [toolUse('t3', 'click', { 'index': 0 })]),
+        reply('tool_use', [toolUse('t4', 'click', { 'index': 0 })]),
+        reply('tool_use', [toolUse('t5', 'type_text', { 'index': 0, 'text': 'Hi' })]),
+        reply('tool_use', [toolUse('t6', 'click', { 'index': 0 })]),
+        finish('t7')
+      ];
+      const result = await loop.run('task');
+      expect(result.success).assertTrue();
     });
   });
 }
