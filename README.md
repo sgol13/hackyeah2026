@@ -6,8 +6,9 @@ AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gem
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [AI_WORKFLOW.md](AI_WORKFLOW.md)
-- Demo video: _(link on submission)_
 - Ready-to-install package: [`build/phoneagent-release-signed.hap`](build/phoneagent-release-signed.hap) (see [Install the prebuilt .hap](#install-the-prebuilt-hap))
+
+[oniro-agent.mp4](oniro-agent.mp4)
 
 ## At a glance
 
