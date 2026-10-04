@@ -1,7 +1,0 @@
-{
-  "accessibilityCapabilities": [
-    "retrieve",
-    "gesture"
-  ],
-  "accessibilityCapabilityRationale": "a11y_rationale"
-}

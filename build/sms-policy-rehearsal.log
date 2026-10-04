@@ -1,7 +1,0 @@
-﻿10-04 09:30:34.806  7484  7484 I A00a11/AgentA11y: service connected (onConnect)
-10-04 09:30:34.807  7484  7484 I A00a11/AgentA11y: service connected (onAccessibilityConnect)
-10-04 09:30:35.346  7484  7484 I A00a11/AgentA11y: [task] Send Grandma an SMS saying I will come to her birthday party tomorrow at 17:00.
-10-04 09:30:37.409  7484  7484 I A00a11/AgentA11y: [action] Open messages
-10-04 09:30:43.115  7484  7484 I A00a11/AgentA11y: [thought] Already filled in. Send.
-10-04 09:30:43.115  7484  7484 I A00a11/AgentA11y: [action] Tap image
-10-04 09:30:45.944  7484  7484 I A00a11/AgentA11y: [done] Sent Grandma an SMS.
