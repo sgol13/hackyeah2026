@@ -84,7 +84,7 @@ struct Index {
               .height(280).onChange((value: string) => { this.body = value; })
             Button('Save note').id('save_note').width('100%').enabled(!this.busy).onClick(() => { this.save(); })
           }.width('100%')
-        }.layoutWeight(1).width('100%')
+        }.layoutWeight(1).width('100%').align(Alignment.Top)
       } else if (this.selected !== undefined) {
         Scroll() {
           Column({ space: 16 }) {
@@ -95,17 +95,17 @@ struct Index {
               Button('Delete note').onClick(() => this.remove()).enabled(!this.busy)
             }
           }.width('100%')
-        }.layoutWeight(1).width('100%')
+        }.layoutWeight(1).width('100%').align(Alignment.Top)
       } else {
         List({ space: 12 }) {
           if (this.notes.length === 0) { ListItem() { Text('No notes yet. Tap New note to add one.') } }
           ForEach(this.notes, (note: Note) => {
             ListItem() {
               Column({ space: 8 }) {
-                Text(note.title).fontSize(20).fontWeight(FontWeight.Medium).width('100%')
+                Button(note.title).id(`open_note_${note.id}`).fontSize(20).width('100%')
+                  .onClick(() => { this.selected = note; this.notice = ''; })
                 Text(note.body).fontSize(15).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
               }.padding(16).backgroundColor('#FFFFFF').borderRadius(16).width('100%')
-              .accessibilityText(`Open note ${note.title}`).onClick(() => { this.selected = note; this.notice = ''; })
             }
           }, (note: Note) => note.id)
         }.layoutWeight(1).width('100%')

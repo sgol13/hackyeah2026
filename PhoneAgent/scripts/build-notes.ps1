@@ -21,7 +21,7 @@ try {
 } finally { Pop-Location }
 $signed = Join-Path $agentRoot 'build\notes-signed.hap'
 New-Item -ItemType Directory -Force (Split-Path -Parent $signed) | Out-Null
-& (Join-Path $PSScriptRoot 'sign.ps1') -ProjectRoot $notesRoot -InHap (Join-Path $notesRoot 'entry\build\default\outputs\default\entry-default-unsigned.hap') -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
+& (Join-Path $PSScriptRoot 'sign.ps1') -DevEco $DevEco -ProjectRoot $notesRoot -InHap (Join-Path $notesRoot 'entry\build\default\outputs\default\entry-default-unsigned.hap') -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
 if (-not $?) { throw 'Notes signing failed' }
 if ($NoInstall) { return }
 $hdc = Join-Path $DevEco 'sdk\default\openharmony\toolchains\hdc.exe'

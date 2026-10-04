@@ -37,12 +37,14 @@ export interface SerializedScreen {
 }
 
 const MAX_TEXT = 80;
+// Reading note/message content must preserve details beyond a short control label.
+const MAX_CONTENT_TEXT = 4000;
 const MAX_FOLDED_TEXTS = 3;
 const FOLD_SEPARATOR = ' · ';
 
-function clip(s: string): string {
+function clip(s: string, limit: number = MAX_TEXT): string {
   const oneLine = s.replace(/\s+/g, ' ').trim();
-  return oneLine.length > MAX_TEXT ? oneLine.substring(0, MAX_TEXT - 1) + '…' : oneLine;
+  return oneLine.length > limit ? oneLine.substring(0, limit - 1) + '…' : oneLine;
 }
 
 function isVisible(n: UiNode): boolean {
@@ -69,7 +71,8 @@ export function isInteresting(n: UiNode): boolean {
 /** One line for an element; `label` (folded child texts) is used when the node has no text. */
 export function describeNode(index: number, n: UiNode, label?: string): string {
   let line = `[${index}] ${n.type.length > 0 ? n.type : 'View'}`;
-  const text = clip(n.text.trim().length > 0 ? n.text : (label ?? ''));
+  const contentLimit = n.editable || (!isActionable(n) && n.text.trim().length > 0) ? MAX_CONTENT_TEXT : MAX_TEXT;
+  const text = clip(n.text.trim().length > 0 ? n.text : (label ?? ''), contentLimit);
   const desc = clip(n.desc);
   const hint = clip(n.hint);
   if (text.length > 0) {

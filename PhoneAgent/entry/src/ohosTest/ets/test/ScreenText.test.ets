@@ -67,10 +67,19 @@ export default function screenTextTest() {
     });
 
     it('clips long texts to one line', 0, () => {
-      const n = node('Text', 'line one\nline two ' + 'x'.repeat(200));
+      const n = node('Text', 'line one\nline two ' + 'x'.repeat(4000));
       const line = describeNode(0, n);
       expect(line.indexOf('\n')).assertEqual(-1);
       expect(line).assertContain('…');
+    });
+
+    it('preserves note details beyond the short control-label limit', 0, () => {
+      const body = 'Party information '.repeat(8) + 'Buy a gift on 2026-10-05 at 10:00.';
+      const screen = serializeScreen([node('Text', body)], 10);
+      expect(screen.text).assertContain('Buy a gift on 2026-10-05 at 10:00.');
+      const button = node('Button', 'x'.repeat(200));
+      button.clickable = true;
+      expect(describeNode(0, button)).assertContain('…');
     });
 
     it('folds the texts of a tappable row into the row', 0, () => {

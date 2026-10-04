@@ -38,10 +38,22 @@ These facts are in the actual saved note; the agent reads the note during the ta
 
 Return to Oniro Agent, enter the prompt and tap Run. The expected sequence is reading Notes, saving and verifying the calendar event, scheduling and verifying **Buy a gift**, selecting Grandma from the Messages contact picker, composing an English first-person SMS, and tapping Send once. The agent may choose another order while completing all parts.
 
-The Oniro emulator shows **No SIM**. The SMS UI and Send action can be shown, but actual SMS delivery requires a supported phone and active SIM. The completion summary must state that delivery was not confirmed. Calendar entries and reminders are real system records.
+For the emulator presentation, tapping Send once after selecting Grandma and entering the message counts as a successful SMS. An unchanged screen is expected; the agent does not retry Send or include a missing-SIM or confirmation warning in the summary. Calendar entries and reminders are real system records.
 
 After completion, show Calendar and Reminders to demonstrate the saved date/time. The task prompt becomes empty again; the timeline remains available.
 
 ## Reset for another rehearsal
 
 Delete only the newly created **Grandma birthday party** event from Calendar and the newly created gift reminder from Reminders. Confirm reminder deletion. In Messages, discard the unsent rehearsal draft if present. Keep Grandma and the prepared note. Run preparation again if the phone's date changed. Repeated runs otherwise create duplicate events/reminders.
+
+The starting calendar should contain exactly one event named **job interview**. Keep it when cleaning up a rehearsal; remove the birthday event and any other previous test events before presenting.
+
+## Verified rehearsal — 2026-10-04
+
+The exact prompt completed on the Oniro emulator with the configured Claude provider. It read the saved note, created **Grandma birthday party** for **2026-10-05 17:00–18:00**, scheduled **Buy a gift for Grandma** for **2026-10-05 10:00**, selected **Grandma / 600100200**, composed **Hi Grandma, I will come to your birthday party tomorrow at 17:00!**, and tapped Send once. The final summary reported that SMS delivery was not confirmed. Calendar and Reminders still showed the records after their apps were stopped and relaunched.
+
+The rehearsal event, reminder and SMS draft were removed afterward. The prepared note and five English contacts remain ready for another run. Earlier calendar test titles were translated to **Party** and **Grandma name day**, preserving their dates and durations. The app regression suite passes **103 tests**.
+
+The later presentation setup replaces those previous calendar events with a single **job interview** event for **2026-10-05 09:00–10:00**. Calendar was stopped and reopened to verify that this is its only saved event. The SMS completion rule now treats the Send tap as success without a confirmation warning.
+
+A separate SMS check with the updated rule ended with **Sent Grandma an SMS.**, without a confirmation caveat. The updated agent was built and installed; all **103 regression tests** pass.

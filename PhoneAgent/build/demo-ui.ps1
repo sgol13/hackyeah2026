@@ -1,4 +1,4 @@
-param([string]$Action='list', [string]$Id='', [string]$Text='', [string]$Bundle='com.hackyeah.phoneagent', [switch]$MatchText)
+param([string]$Action='list', [string]$Id='', [string]$Text='', [string]$Bundle='com.hackyeah.phoneagent', [switch]$MatchText, [string]$WithinText='' )
 $ErrorActionPreference='Stop'
 $skillsHdc='C:/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/toolchains/hdc.exe'
 & $skillsHdc -t 127.0.0.1:55555 shell uitest dumpLayout -p /data/local/tmp/skills-ui.json -b $Bundle | Out-Null
@@ -14,7 +14,9 @@ if($Action -eq 'list') {
   $skillsNodes | Where-Object {$_.id -or $_.text} | Select-Object id,text,bounds,type,checked | ConvertTo-Json -Compress
   exit
 }
-$skillsNode=$skillsNodes | Where-Object { ($MatchText -and $_.text -eq $Id) -or (-not $MatchText -and $_.id -eq $Id) } | Select-Object -First 1
+$demoWithinPrefix=''
+if($WithinText) { $demoWithinNode=$skillsNodes | Where-Object {$_.text -eq $WithinText} | Select-Object -First 1; if(!$demoWithinNode) { throw "Missing row: $WithinText" }; $demoWithinPrefix=$demoWithinNode.hierarchy.Substring(0,$demoWithinNode.hierarchy.LastIndexOf(',')) }
+$skillsNode=$skillsNodes | Where-Object { ($MatchText -and $_.text -eq $Id) -or (-not $MatchText -and $_.id -eq $Id) } | Where-Object { !$WithinText -or $_.hierarchy.StartsWith($demoWithinPrefix + ',') } | Select-Object -First 1
 if(!$skillsNode) { throw "Missing node: $Id" }
 $skillsCoords=[regex]::Matches($skillsNode.bounds,'\d+') | ForEach-Object {[int]$_.Value}
 $skillsX=[int](($skillsCoords[0]+$skillsCoords[2])/2)

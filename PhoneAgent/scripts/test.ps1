@@ -33,7 +33,7 @@ try {
 }
 $testUnsigned = Join-Path $root 'entry\build\default\outputs\ohosTest\entry-ohosTest-unsigned.hap'
 $testSigned = Join-Path $root 'build\phoneagent-test-signed.hap'
-& (Join-Path $PSScriptRoot 'sign.ps1') -InHap $testUnsigned -OutHap $testSigned -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
+& (Join-Path $PSScriptRoot 'sign.ps1') -DevEco $DevEco -InHap $testUnsigned -OutHap $testSigned -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
 if (-not $?) { throw 'test hap signing failed' }
 
 # 3. install both and run

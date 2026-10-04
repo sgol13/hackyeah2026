@@ -13,3 +13,5 @@
 /.signing
 # challenge PDFs are not ours to redistribute
 /docs/*.pdf
+# local video editing tools, downloads and rendered clips
+/build/video-tools/

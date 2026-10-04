@@ -46,7 +46,7 @@ $unsigned = Join-Path $root 'entry\build\default\outputs\default\entry-default-u
 $outDir = Join-Path $root 'build'
 New-Item -ItemType Directory -Force $outDir | Out-Null
 $signed = Join-Path $outDir $(if ($Release) { 'phoneagent-release-signed.hap' } else { 'phoneagent-signed.hap' })
-& (Join-Path $PSScriptRoot 'sign.ps1') -InHap $unsigned -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
+& (Join-Path $PSScriptRoot 'sign.ps1') -DevEco $DevEco -InHap $unsigned -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
 if (-not $?) { throw 'signing failed' }
 
 if ($NoInstall) { return }

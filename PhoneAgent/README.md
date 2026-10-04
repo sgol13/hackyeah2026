@@ -1,5 +1,6 @@
 # Oniro Agent
 
+<<<<<<< Updated upstream
 HackYeah 2026, Huawei challenge. You type "text grandma that I'll come to her birthday" and an AI model does it on the phone: opens Messages, picks the contact, types, sends. Works with any app through accessibility. Only possible on OpenHarmony / Oniro (system app).
 
 AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gemini (implemented and unit-tested; live endpoints checked only with an invalid key, no real keys). Model and reasoning effort are chosen in Settings; effort levels per model follow the providers' docs as of 2026-10-04 and were not checked live.
@@ -249,3 +250,30 @@ Calendar date validation checks (using DevEco's bundled Node and the full SDK):
 ## Not ours
 
 DevEco template, OpenHarmony SDK + public test signing certs, Oniro emulator, Bricolage Grotesque font (OFL, `entry/src/main/resources/rawfile/fonts/OFL.txt`). No runtime libraries.
+=======
+HackYeah 2026, Huawei challenge. You type a task and an AI model does it on the phone, operating its apps through accessibility. More: [ARCHITECTURE.md](ARCHITECTURE.md), [AI_WORKFLOW.md](AI_WORKFLOW.md).
+
+## Setup and start (DevEco Studio)
+
+Requirements: Windows 11 x64 with virtualization enabled in BIOS/UEFI, 8 GB RAM, ~10 GB free disk, internet, and an API key from Anthropic, OpenAI, xAI or Google Gemini. Run all commands in DevEco Studio's Terminal (it opens in the project folder).
+
+1. **DevEco Studio**: install it from https://developer.huawei.com/consumer/en/download/ into `C:\Program Files\Huawei\DevEco Studio`, then open this project folder (the one with `AppScope`, `entry`, `scripts`).
+2. **Full SDK (API 20)**: download [ohos-sdk-full 6.0.0.48](https://cidownload.openharmony.cn/version/Master_Version/OpenHarmony_6.0.0.48/20251122_043125/version-Master_Version-OpenHarmony_6.0.0.48-20251122_043125-ohos-sdk-full.tar.gz) (or a full API 20 SDK from https://dcp.openharmony.cn/). Unpack every ZIP from its `ohos-sdk\windows` folder into `%LOCALAPPDATA%\OpenHarmony\Sdk\20`, so that `ets`, `js`, `native`, `previewer`, `toolchains` sit directly in `20`. In File > Settings > OpenHarmony SDK set the location to `%LOCALAPPDATA%\OpenHarmony\Sdk`.
+3. **Emulator**:
+   - In PowerShell as administrator: `Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All`, reboot if asked.
+   - Install QEMU: `winget install --exact --id SoftwareFreedomConservancy.QEMU`
+   - Download and unpack Oniro v6.1 (1.45 GB):
+     ```powershell
+     $o = Join-Path $env:USERPROFILE 'oniro'; New-Item -ItemType Directory -Force $o | Out-Null
+     curl.exe -fL https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v6.1/oniro_emulator.zip -o "$o\oniro_emulator.zip"
+     tar.exe -xf "$o\oniro_emulator.zip" -C $o
+     ```
+4. **Emulator button**: File > Settings > Tools > External Tools > **+**: Name `Start Oniro emulator`, Program `powershell.exe`, Arguments `-NoProfile -ExecutionPolicy Bypass -File "$ProjectFileDir$\scripts\start-emulator.ps1"`, Working directory `$ProjectFileDir$`.
+5. **Signing (once)**: `powershell -ExecutionPolicy Bypass -File .\scripts\sign.ps1 -PrepareOnly`. It uses the public OpenHarmony test certificates in `signing/`; no Huawei account is needed. Keep the generated `.signing` folder.
+6. **Run**:
+   - Tools > External Tools > Start Oniro emulator; wait for `Emulator booted and connected: 127.0.0.1:55555` (~30 s).
+   - Select device `127.0.0.1:55555` (if missing: Tools > IP Connection > `127.0.0.1:55555`) and click **Run**.
+   - In Oniro Agent open Settings (sliders icon), choose the provider, enter the API key and pick a model. The main screen shows "Agent service on".
+
+If Run reports "No device has been selected" or a SysCap error (00401004), the emulator was still booting: wait and click Run again.
+>>>>>>> Stashed changes

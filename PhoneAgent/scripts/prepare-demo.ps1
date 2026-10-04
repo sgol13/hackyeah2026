@@ -12,7 +12,7 @@ $demoApps = @{
 }
 foreach ($demoApp in $demoApps.GetEnumerator()) {
     $demoInstalled = (& $demoHdc -t $Target shell "bm dump -n $($demoApp.Value)") -join "`n"
-    if ($demoInstalled -notmatch [regex]::Escape($demoApp.Value)) {
+    if ($demoInstalled -notmatch ('"bundleName"\s*:\s*"' + [regex]::Escape($demoApp.Value) + '"')) {
         throw "$($demoApp.Key) is not installed ($($demoApp.Value)). Follow README Setup first."
     }
     Write-Host "$($demoApp.Key): installed"
@@ -21,4 +21,5 @@ $demoSeed = (& $demoHdc -t $Target shell 'aa start -a EntryAbility -b com.hackye
 if ($demoSeed -notmatch 'start ability successfully') { throw "Could not prepare Notes: $demoSeed" }
 Write-Host 'Notes opened. Check Grandma birthday party: tomorrow at 17:00, gift reminder at 10:00.'
 Write-Host 'Confirm Grandma exists in Contacts. This script preserves contacts, calendar events and reminders.'
+Write-Host 'Calendar should contain only job interview before presenting; remove other test events in Calendar.'
 Write-Host 'Before a repeat presentation, remove only the previous demo event/reminder using their Delete buttons.'

@@ -21,7 +21,7 @@ try {
 } finally { Pop-Location }
 $signed = Join-Path $agentRoot 'build\reminders-signed.hap'
 New-Item -ItemType Directory -Force (Split-Path -Parent $signed) | Out-Null
-& (Join-Path $PSScriptRoot 'sign.ps1') -ProjectRoot $remindersRoot -InHap (Join-Path $remindersRoot 'entry\build\default\outputs\default\entry-default-unsigned.hap') -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
+& (Join-Path $PSScriptRoot 'sign.ps1') -DevEco $DevEco -ProjectRoot $remindersRoot -InHap (Join-Path $remindersRoot 'entry\build\default\outputs\default\entry-default-unsigned.hap') -OutHap $signed -SdkLib (Join-Path $Sdk '20\toolchains\lib') -Java "$env:JAVA_HOME\bin\java.exe"
 if (-not $?) { throw 'Reminders signing failed' }
 if ($NoInstall) { return }
 $hdc = Join-Path $DevEco 'sdk\default\openharmony\toolchains\hdc.exe'
