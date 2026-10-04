@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4B5563"/>
+    </marker>
+    <marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0F766E"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+
+  <!-- Title -->
+  <text x="60" y="90" font-size="44" font-weight="700" fill="#111827">How Oniro Agent works</text>
+  <text x="60" y="132" font-size="22" fill="#4B5563">An AI model operates any app on the phone through accessibility. It reads the screen as text, not screenshots.</text>
+
+  <!-- You -->
+  <rect x="60" y="320" width="230" height="160" rx="20" fill="#F3F4F6"/>
+  <text x="175" y="372" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">You</text>
+  <text x="175" y="412" font-size="18" fill="#374151" text-anchor="middle" font-style="italic">“Text grandma I’ll come</text>
+  <text x="175" y="437" font-size="18" fill="#374151" text-anchor="middle" font-style="italic">to her birthday”</text>
+  <line x1="292" y1="400" x2="356" y2="400" stroke="#4B5563" stroke-width="3" marker-end="url(#a)"/>
+
+  <!-- Agent UI -->
+  <rect x="360" y="300" width="300" height="200" rx="20" fill="#EEF2FF" stroke="#6366F1" stroke-width="2"/>
+  <text x="510" y="352" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">Oniro Agent UI</text>
+  <text x="510" y="387" font-size="18" fill="#374151" text-anchor="middle">app screen or floating orb</text>
+  <rect x="395" y="420" width="230" height="40" rx="20" fill="#0F766E"/>
+  <text x="510" y="446" font-size="17" fill="#FFFFFF" text-anchor="middle">TYPE_FLOAT overlay</text>
+
+  <!-- UI <-> service -->
+  <text x="730" y="335" font-size="16" font-weight="700" fill="#0F766E" text-anchor="middle">common events</text>
+  <text x="730" y="368" font-size="15" fill="#374151" text-anchor="middle">RUN · STOP</text>
+  <line x1="662" y1="382" x2="796" y2="382" stroke="#4B5563" stroke-width="3" marker-end="url(#a)"/>
+  <line x1="798" y1="420" x2="664" y2="420" stroke="#4B5563" stroke-width="3" marker-end="url(#a)"/>
+  <text x="730" y="448" font-size="15" fill="#374151" text-anchor="middle">STATUS (steps)</text>
+
+  <!-- Agent service -->
+  <rect x="800" y="240" width="400" height="320" rx="24" fill="#FFFFFF" stroke="#0F766E" stroke-width="3"/>
+  <text x="1000" y="290" font-size="28" font-weight="700" fill="#111827" text-anchor="middle">Agent service</text>
+  <rect x="850" y="308" width="300" height="40" rx="20" fill="#0F766E"/>
+  <text x="1000" y="334" font-size="17" fill="#FFFFFF" text-anchor="middle">AccessibilityExtensionAbility</text>
+  <text x="1000" y="380" font-size="16" fill="#4B5563" text-anchor="middle">keeps running while other apps are in front</text>
+
+  <!-- Loop -->
+  <rect x="838" y="412" width="96" height="44" rx="12" fill="#F0FDFA" stroke="#0F766E"/>
+  <text x="886" y="440" font-size="16" fill="#111827" text-anchor="middle">① screen</text>
+  <rect x="960" y="412" width="96" height="44" rx="12" fill="#F0FDFA" stroke="#0F766E"/>
+  <text x="1008" y="440" font-size="16" fill="#111827" text-anchor="middle">② model</text>
+  <rect x="1082" y="412" width="96" height="44" rx="12" fill="#F0FDFA" stroke="#0F766E"/>
+  <text x="1130" y="440" font-size="16" fill="#111827" text-anchor="middle">③ action</text>
+  <line x1="935" y1="434" x2="956" y2="434" stroke="#0F766E" stroke-width="2" marker-end="url(#t)"/>
+  <line x1="1057" y1="434" x2="1078" y2="434" stroke="#0F766E" stroke-width="2" marker-end="url(#t)"/>
+  <path d="M1130 457 V490 H886 V461" fill="none" stroke="#0F766E" stroke-width="2" marker-end="url(#t)"/>
+  <text x="1000" y="525" font-size="15" fill="#4B5563" text-anchor="middle">repeat until finish (max 25 steps, Stop anytime)</text>
+
+  <!-- service <-> AI -->
+  <text x="1260" y="368" font-size="15" fill="#374151" text-anchor="middle">screen as text</text>
+  <line x1="1202" y1="382" x2="1316" y2="382" stroke="#4B5563" stroke-width="3" marker-end="url(#a)"/>
+  <line x1="1318" y1="420" x2="1204" y2="420" stroke="#4B5563" stroke-width="3" marker-end="url(#a)"/>
+  <text x="1260" y="448" font-size="15" fill="#374151" text-anchor="middle">next tool call</text>
+
+  <!-- AI model -->
+  <rect x="1320" y="310" width="240" height="180" rx="20" fill="#FFF7ED" stroke="#EA580C" stroke-width="2"/>
+  <text x="1440" y="360" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">AI model</text>
+  <text x="1440" y="398" font-size="17" fill="#374151" text-anchor="middle">Claude · OpenAI</text>
+  <text x="1440" y="423" font-size="17" fill="#374151" text-anchor="middle">Grok · Gemini</text>
+  <text x="1440" y="460" font-size="15" fill="#6B7280" text-anchor="middle">HTTPS · tool use</text>
+
+  <!-- service <-> apps -->
+  <line x1="900" y1="678" x2="900" y2="564" stroke="#0F766E" stroke-width="3" marker-end="url(#t)"/>
+  <text x="884" y="612" font-size="16" fill="#0F766E" text-anchor="end">reads UI tree</text>
+  <text x="884" y="636" font-size="16" fill="#0F766E" text-anchor="end">(accessibility)</text>
+  <line x1="1100" y1="562" x2="1100" y2="676" stroke="#0F766E" stroke-width="3" marker-end="url(#t)"/>
+  <text x="1116" y="612" font-size="16" fill="#0F766E">click · type · scroll</text>
+  <text x="1116" y="636" font-size="16" fill="#0F766E">open apps (startAbility)</text>
+
+  <!-- Any app -->
+  <rect x="800" y="680" width="400" height="150" rx="20" fill="#F3F4F6"/>
+  <text x="1000" y="738" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">Any app on the phone</text>
+  <text x="1000" y="778" font-size="18" fill="#374151" text-anchor="middle">Messages · Contacts · Settings …</text>
+
+  <!-- What the model sees -->
+  <rect x="60" y="600" width="600" height="140" rx="16" fill="#111827"/>
+  <text x="84" y="636" font-size="16" font-weight="700" fill="#9CA3AF">What the model sees</text>
+  <text x="84" y="674" font-size="19" fill="#E5E7EB" font-family="Consolas, Menlo, monospace">[1] Text "Babcia" @130,64</text>
+  <text x="84" y="708" font-size="19" fill="#E5E7EB" font-family="Consolas, Menlo, monospace">[6] TextArea hint="Text message" (click,edit) @164,659</text>
+
+  <!-- Legend -->
+  <rect x="60" y="786" width="22" height="22" rx="6" fill="#0F766E"/>
+  <text x="94" y="804" font-size="17" fill="#374151">OpenHarmony system capability (app signed as system_core)</text>
+</svg>
