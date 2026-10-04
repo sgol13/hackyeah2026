@@ -190,56 +190,6 @@ To add an emulator start button under **File → Settings → Tools → External
 
 Leave **Open console for tool output** enabled. For a custom SDK location, prepare signing with `.\scripts\sign.ps1 -PrepareOnly -SdkLib 'D:\OpenHarmony\Sdk\20\toolchains\lib'`; add `-DevEco` if the IDE is installed elsewhere.
 
-## Use
-
-Settings (sliders icon, top right) → AI provider → API key → model (or "Custom model ID…"). Each provider keeps its own key. Back on the main screen type the task and tap the round button. To test the SMS task, add a contact "Grandma" first.
-
-When you leave the app it shrinks into a floating orb (like a chat head; drag it to either edge); tap the orb to open the app again. While a task runs, a pill at the top shows the current step and the model's latest thought; its red button stops the task immediately, and tapping the pill shows all steps. Turn the orb off in Settings.
-
-Contacts on the prepared test emulator: Grandma, Mom, Dad, Grandpa, Jacob (600100200–600100204). Their original numbers were preserved when the names were translated. A fresh Oniro image needs these demo contacts added separately.
-
-### Birthday presentation
-
-Follow [DEMO.md](DEMO.md) for the presentation and repeat-run cleanup. After building the four apps, refresh the prepared note:
-
-```powershell
-.\scripts\prepare-demo.ps1
-```
-
-This checks the installed bundles and explicitly seeds **Grandma birthday party** in the debug Notes app for tomorrow at **17:00–18:00**, with the gift reminder at **10:00**. Normal Notes launches do not seed data. Confirm Grandma exists in Contacts, then enter:
-
-> Check in notes what time grandma’s birthday party is, create an event in the calendar and set a reminder to buy a gift. Send SMS to the grandma that I will come
-
-The emulator has no SIM: the agent can select Grandma, compose the English SMS and press Send, but mobile-network delivery cannot be demonstrated on this image. It reports that limitation in its final summary.
-
-### User skills
-
-Open **Skills** (the book icon beside Settings), then tap **+** to add instructions. Name and Description are required; limits are 60, 200 and 4000 characters for Name, Description and Body. Names are unique regardless of case. Save applies changes; Back discards them. Existing skills can be edited, disabled with the list toggle, or deleted after confirmation.
-
-At task start the agent receives the enabled skills' names and descriptions. It loads relevant instructions using `read_skill`; the timeline shows **Read skill: name**. Skill contents stay fixed for that task, and each read counts toward the 25-step limit. There are no built-in skills.
-
-### Calendar tasks
-
-The Oniro v6.1 image includes the hidden `com.ohos.calendardata` data service, but no usable Calendar UI. Build and install the separate Calendar companion app:
-
-```powershell
-.\scripts\build-calendar.ps1
-```
-
-Allow calendar access when it first opens. It appears as **Calendar** in the launcher (`com.hackyeah.calendar`) and stores events in the system calendar service. Then rebuild Oniro Agent with `.\scripts\build.ps1` and enter:
-
-> utworz wydarzenie w kalendarzu o nazwie impreza jutro o 17
-
-The agent opens Calendar, fills the event form and saves **impreza** for tomorrow at **17:00**, with a one-hour duration by default. Relative dates use the phone's local date and timezone. Events remain saved after closing the app. The Calendar source is in `calendar/`; it is a small companion app, separate from OpenHarmony's upstream Calendar app.
-
-Verified on the Oniro emulator on 2026-10-04 with this exact Polish prompt: the agent saved **impreza**, **2026-10-05 17:00–18:00**, and the event remained after restarting Calendar.
-
-Calendar date validation checks (using DevEco's bundled Node and the full SDK):
-
-```powershell
-& 'C:\Program Files\Huawei\DevEco Studio\tools\node\node.exe' .\calendar\test-time.cjs
-```
-
 ## Check
 
 - Tests: `.\scripts\test.ps1` → `Pass: 106`
