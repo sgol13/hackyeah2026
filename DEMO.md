@@ -19,7 +19,7 @@ Follow README Setup, start the emulator, and build/install Oniro Agent plus the 
 
 The existing demo contacts have been renamed to Grandma, Mom, Dad, Grandpa and Jacob, keeping numbers 600100200 through 600100204 respectively. On a fresh image add Grandma with 600100200 in Contacts before using this prompt.
 
-Run from the PhoneAgent project directory:
+Run from the repository root:
 
 ```powershell
 .\scripts\prepare-demo.ps1

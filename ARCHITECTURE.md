@@ -2,7 +2,6 @@
 
 One ArkTS app, signed as a system app. You give it a task in plain language, and an AI model completes it by operating the phone's other apps.
 
-<<<<<<< Updated upstream
 ![How Oniro Agent works](docs/architecture.svg)
 
 ## Components
@@ -21,6 +20,8 @@ Paths are relative to `entry/src/main/ets/`.
 | App UI | `pages/Index.ets`, `pages/Settings.ets`, `common/AgentClient.ets` | Task input, live step list, settings. Starts and stops tasks; it does not run them. |
 | Overlay | `overlay/OverlayService.ets`, `overlay/OverlayController.ets` | `ServiceExtensionAbility` with `TYPE_FLOAT` windows. The orb is the app minimized (like a chat head): shown while the app is in the background and no task runs; tap opens the app. While a task runs, a status pill (current step, latest thought, Stop) and an edge glow show instead. |
 | Messaging | `common/Bridge.ets` | Common events between UI, overlay and agent service. |
+
+Readable text and editable fields retain up to 4000 characters so long notes keep their dates and instructions; control labels remain capped at 80 characters.
 
 ## One task, step by step
 
@@ -93,20 +94,3 @@ All the numbers (retries, timeouts, validation, limits) are in the README, [Tech
 - **No confirmation before irreversible actions** (Send, Delete). This was a deliberate hackathon scope; a product should ask first.
 - **Prompt injection.** On-screen text, such as an incoming message, is model input. The narrow tool set limits the damage, but cannot rule it out.
 - **Emulator quirks.** Float windows can't `minimize()`, so the orb uses `hide()`. The launcher shows layered icons as blank tiles, so the icon is a flat PNG.
-=======
-- **AI**: no SDK. Hand-written clients (`@kit.NetworkKit` http) in a tool-use loop (`agent/`). The loop keeps one conversation format (Anthropic-style text / tool_use / tool_result blocks); each provider client translates it: Anthropic Messages (`Anthropic.ets`), OpenAI-compatible Chat Completions for OpenAI and xAI Grok (`OpenAiCompat.ets`), Gemini generateContent incl. thought signatures (`Gemini.ets`). Shared retries and error mapping in `Http.ets`, provider list and factory in `Providers.ets`.
-- **Seeing and clicking**: `AccessibilityExtensionAbility`. It reads the other app's UI tree, turns it into text for the model (`[6] TextArea "Hello" (click,edit)`), then clicks, types and scrolls through `executeAction`. No screenshots, no vision.
-  Typing selects existing text before inserting the replacement: ArkUI's `SET_TEXT` inserts at the cursor on this image, so prefilled fields otherwise concatenate the old and new values.
-  The screen serializer keeps up to 4000 characters for readable text and editable fields so long notes retain their dates and instructions; control labels remain capped at 80 characters.
-- **Where the loop runs**: inside the accessibility extension, because it keeps running in the background while other apps are in front. The UI is only a remote control. The two talk over common events.
-- **Alarms**: the Clock app on the Oniro image is a clock-face sample (`ohos.samples.etsclock`) with no alarms, so there is nothing to tap. The agent has a `set_alarm` tool instead: a one-time alarm through the system reminder service (`reminderAgentManager`, alarm type), which rings with a notification. It switches on its own notifications first (system API).
-- **Launching apps**: `launcherBundleManager` lists the apps and `startAbility` opens them.
-- **User skills**: `pages/Skills` and `pages/SkillEdit` manage user-written instructions. `agent/Skills.ets` validates records and tolerantly parses the JSON array stored under `skills` in the existing `settings` Preferences. The accessibility service drops the Preferences cache at task start and snapshots enabled skills. Providers receive a per-run system prompt containing names/descriptions and a dynamic `read_skill` tool whose enum lists those names. The loop returns the snapshotted body without a device action; the read appears in the timeline and consumes a normal step. Disabled skills are excluded from both the prompt and the tool.
-- **Calendar**: a separate companion HAP (`calendar/`, `com.hackyeah.calendar`) provides an accessible event form and event list over the image's existing CalendarData service (`@kit.CalendarKit`). Oniro Agent operates its UI using the same general tools as other apps. Each task includes the phone's local date/time and tomorrow's date; unspecified event duration defaults to one hour. Calendar requests read/write calendar permissions when first opened and verifies writes by reading events back from the service.
-- **Notes**: the English companion (`notes/`, `com.hackyeah.notes`) stores notes in app-private Preferences and exposes the full selected note as native Text. The stock Notes web editor does not expose its body in the emulator's accessibility tree. `scripts/prepare-demo.ps1` explicitly requests a debug-only birthday-note fixture whose dates use the phone's tomorrow; ordinary launches preserve user notes without seeding.
-- **Reminders**: the English companion (`reminders/`, `com.hackyeah.reminders`) publishes dated calendar reminders with `reminderAgentManager`, enables its notifications through the system API, and verifies the returned reminder ID using `getAllValidReminders`. Its list reads the actual system schedule, including after restart; Delete cancels that schedule. The agent uses the native accessible form through its existing device tools.
-- **Overlay**: OverlayService (ServiceExtensionAbility) owns TYPE_FLOAT windows. The orb is the app minimized (like a chat head): shown while the app is in the background and no task runs; tap opens the app. While a task runs, a pill at the top (current step, the model's latest thought, a Stop button) and an edge glow show instead. The pill and glow are not focusable, so the app the agent operates stays the active window. It talks to the agent service over the same common events as the app. Stop ends the task at once: the loop abandons a pending model call (`Promise.race` with a stop signal). On the emulator `minimize()` is not supported for float windows (the orb uses `hide()`). A service extension needs `AllowAppUsePrivilegeExtension` in the signing profile (`signing/profile-template.json`).
-- **Long-press Home**: dropped in favour of the orb. The stock SystemUI navigation bar sends no key event for its soft Home button and has no long-press handler, so an app cannot hook it; it would need a patched and reinstalled `com.ohos.systemui` (possible in principle: the emulator uses the legacy SystemUI, signed with the public test key).
-- **Launcher icon**: a flat PNG (`media/app_icon.png`). The Oniro launcher shows layered icons as blank tiles.
-- **System app**: listing apps, starting them from the background and turning on accessibility from code all need system permissions. The app is signed `system_core` with the public OpenHarmony test CA (`scripts/sign.ps1`), so it installs with plain `hdc install`.
->>>>>>> Stashed changes

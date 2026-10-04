@@ -14,7 +14,7 @@
 
 | # | Decision |
 |---|---|
-| D1 | Name shown everywhere (launcher, title, a11y service, system prompt, docs) is **Oniro Agent**. Bundle ID stays `com.hackyeah.phoneagent`; folder `PhoneAgent/`, script names and `phoneagent-signed.hap` stay. |
+| D1 | Name shown everywhere (launcher, title, a11y service, system prompt, docs) is **Oniro Agent**. Bundle ID stays `com.hackyeah.phoneagent`; the project stays at the repository root, script names and `phoneagent-signed.hap` stay. |
 | D2 | Logo = **O ring + A spark**: a thick gradient ring (teal → violet → coral) with a gap at the upper right, and an upward arrowhead spark (the "A", notch = crossbar) cutting into the gap. The ring rotates while the agent works. |
 | D3 | Visual mood: **follows system light/dark**; calm neutral surfaces; the orb gradient is the only strong color (logo, Run button, glow, active step). Large friendly type. |
 | D4 | **All configuration in Settings** (provider, API key, model/custom ID, floating-button switch, agent-service status + Reconnect). Main screen: composer, suggestions, timeline, a read-only model chip that opens Settings. No key → empty state with one "Open Settings" button. |
@@ -69,8 +69,8 @@ Re-checked 2026-10-04 (Task 6b Step 2) against the providers' docs: the suggeste
 
 | File | Status | Responsibility |
 |---|---|---|
-| `PhoneAgent/scripts/screenshot.ps1` | create | Grab a device screenshot to `build/shots/<name>.jpeg` for visual review |
-| `PhoneAgent/design/oa-mark.svg`, `oa-icon-foreground.svg`, `oa-icon-background.svg` | create | Logo masters |
+| `scripts/screenshot.ps1` | create | Grab a device screenshot to `build/shots/<name>.jpeg` for visual review |
+| `design/oa-mark.svg`, `oa-icon-foreground.svg`, `oa-icon-background.svg` | create | Logo masters |
 | `entry/src/main/resources/base/media/oa_ring.svg`, `oa_spark.svg`, `ic_*.svg` | create | In-app logo parts + icons |
 | `AppScope/resources/base/media/foreground.png`, `background.png`, entry `foreground.png`/`background.png`/`startIcon.png` | replace | Launcher + splash icon |
 | `entry/src/main/resources/rawfile/fonts/BricolageGrotesque-SemiBold.ttf`, `OFL.txt` | create | Display font |
@@ -98,9 +98,9 @@ Re-checked 2026-10-04 (Task 6b Step 2) against the providers' docs: the suggeste
 | `entry/src/main/ets/entryability/EntryAbility.ets` | modify | Fonts, start overlay, publish UI visibility |
 | `entry/src/main/ets/a11y/AgentA11y.ets` | modify | Rename text, skip reopening UI for overlay runs |
 | `entry/src/main/module.json5`, `resources/base/profile/main_pages.json`, `signing/profile-template.json` | modify | Service, permission, pages, ACL |
-| `README.md`, `PhoneAgent/README.md`, `PhoneAgent/ARCHITECTURE.md`, `PhoneAgent/AI_WORKFLOW.md` | modify | Name + new UI + spike result |
+| `README.md`, `ARCHITECTURE.md`, `AI_WORKFLOW.md` | modify | Name + new UI + spike result |
 
-All `entry/...` paths below are relative to `PhoneAgent/`.
+All `entry/...` paths below are relative to the repository root.
 
 ---
 
@@ -109,26 +109,26 @@ All `entry/...` paths below are relative to `PhoneAgent/`.
 ### Task 0: Emulator, full SDK and screenshot script on this machine
 
 **Files:**
-- Create: `PhoneAgent/scripts/screenshot.ps1`
+- Create: `scripts/screenshot.ps1`
 
 **Interfaces:**
-- Produces: `.\scripts\screenshot.ps1 -Name <name>` → `PhoneAgent/build/shots/<name>.jpeg`. Used by every visual check below.
+- Produces: `.\scripts\screenshot.ps1 -Name <name>` → `build/shots/<name>.jpeg`. Used by every visual check below.
 
 - [ ] **Step 1: User does the admin-only part** (needs an elevated PowerShell + reboot; ask the user to run these, suggest the `!` prefix for non-admin ones)
 
 ```powershell
 wsl --install -d Ubuntu-24.04      # admin, then reboot, create the Linux user
 ```
-Then follow `PhoneAgent/README.md` → Setup 1.2–1.5 (systemd in `/etc/wsl.conf`, `qemu-system-x86 qemu-utils unzip`, `usermod -aG kvm`, download `oniro_emulator.zip` into `~/oniro/images`).
+Then follow `README.md` → Setup 1.2–1.5 (systemd in `/etc/wsl.conf`, `qemu-system-x86 qemu-utils unzip`, `usermod -aG kvm`, download `oniro_emulator.zip` into `~/oniro/images`).
 
-- [ ] **Step 2: Full SDK** – download `ohos-sdk-full 6.0.0.48` (link in `PhoneAgent/README.md` Setup 2), unpack `ohos-sdk/windows/*` into `%LOCALAPPDATA%\OpenHarmony\Sdk\20\`.
+- [ ] **Step 2: Full SDK** – download `ohos-sdk-full 6.0.0.48` (link in `README.md` Setup 2), unpack `ohos-sdk/windows/*` into `%LOCALAPPDATA%\OpenHarmony\Sdk\20\`.
 
 Run: `Test-Path "$env:LOCALAPPDATA\OpenHarmony\Sdk\20\ets\api\@ohos.multimodalInput.inputConsumer-sys.d.ts"` (or any `*-sys.d.ts`)
 Expected: `True`
 
 - [ ] **Step 3: Boot and baseline**
 
-Run (in `PhoneAgent/`): `.\scripts\start-emulator.ps1` then `.\scripts\test.ps1`
+Run (in the repository root): `.\scripts\start-emulator.ps1` then `.\scripts\test.ps1`
 Expected: `ALL TESTS PASSED: Tests run: 51, Failure: 0, Error: 0, Pass: 51`
 
 - [ ] **Step 4: Write the screenshot script**
@@ -176,7 +176,7 @@ Write down which one exists, and whether the screenshot shows a 3-button bar (�
 - Modify: `entry/src/main/ets/a11y/AgentA11y.ets:2,172`
 - Modify: `entry/src/main/ets/agent/Prompt.ets:2`
 - Modify: `entry/src/main/ets/pages/Index.ets:292` (title only; Index is rewritten in Task 8)
-- Modify: `README.md`, `PhoneAgent/README.md`, `PhoneAgent/ARCHITECTURE.md`, `PhoneAgent/AI_WORKFLOW.md` (prose mentions only)
+- Modify: `README.md`, `ARCHITECTURE.md`, `AI_WORKFLOW.md` (prose mentions only)
 
 **Interfaces:** none.
 
@@ -207,7 +207,7 @@ Write down which one exists, and whether the screenshot shows a 3-button bar (�
   - `Prompt.ets:2` → `You are Oniro Agent, an assistant built into an OpenHarmony phone. …` (only the name changes)
   - `Index.ets:292` → `Text('Oniro Agent')`
 
-- [ ] **Step 4: Docs** – replace the product name "Phone Agent" with "Oniro Agent" in prose of the four docs. Keep the paths `PhoneAgent/`, `phoneagent-signed.hap`, `com.hackyeah.phoneagent`, script names. Root `README.md` title becomes `# Oniro Agent (HackYeah 2026, Huawei challenge)`.
+- [ ] **Step 4: Docs** – replace the product name "Phone Agent" with "Oniro Agent" in prose of the four docs. Keep the paths the repository root, `phoneagent-signed.hap`, `com.hackyeah.phoneagent`, script names. Root `README.md` title becomes `# Oniro Agent (HackYeah 2026, Huawei challenge)`.
 
 Run: `rg -n "Phone Agent" PhoneAgent README.md --glob '!docs/**'`
 Expected: no matches (except `handoff-openharmony-phone-agent.md`, which is a historical note; leave it).
@@ -222,7 +222,7 @@ Expected: title reads "Oniro Agent". Press Home (`& $hdc shell "uinput -K -d 1 -
 ### Task 2: OA mark, launcher icon, `OaMark` component
 
 **Files:**
-- Create: `PhoneAgent/design/oa-mark.svg`, `PhoneAgent/design/oa-icon-foreground.svg`, `PhoneAgent/design/oa-icon-background.svg`
+- Create: `design/oa-mark.svg`, `design/oa-icon-foreground.svg`, `design/oa-icon-background.svg`
 - Create: `entry/src/main/resources/base/media/oa_ring.svg`, `entry/src/main/resources/base/media/oa_spark.svg`
 - Replace: `AppScope/resources/base/media/foreground.png`, `background.png`; `entry/src/main/resources/base/media/foreground.png`, `background.png`, `startIcon.png`
 - Create: `entry/src/main/ets/components/OaMark.ets`
@@ -230,7 +230,7 @@ Expected: title reads "Oniro Agent". Press Home (`& $hdc shell "uinput -K -d 1 -
 **Interfaces:**
 - Produces: `OaMark({ size: number, spinning: boolean })` ArkUI component (`components/OaMark.ets`).
 
-- [ ] **Step 1: Master SVG** – `PhoneAgent/design/oa-mark.svg`:
+- [ ] **Step 1: Master SVG** – `design/oa-mark.svg`:
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
@@ -251,7 +251,7 @@ Expected: title reads "Oniro Agent". Press Home (`& $hdc shell "uinput -K -d 1 -
 
 - [ ] **Step 2: Render and look**
 
-Run (from `PhoneAgent/`): `& "C:\Program Files\Huawei\DevEco Studio\tools\node\npx.cmd" -y @resvg/resvg-js-cli --fit-width 512 design/oa-mark.svg build/shots/oa-mark.png`
+Run (from the repository root): `& "C:\Program Files\Huawei\DevEco Studio\tools\node\npx.cmd" -y @resvg/resvg-js-cli --fit-width 512 design/oa-mark.svg build/shots/oa-mark.png`
 Then Read `build/shots/oa-mark.png`.
 Expected: it reads as "O" + "A": the ring's gap sits at about 1–2 o'clock and the spark's base overlaps the gap without touching the ring ends. If the gap is off, change only `rotate(-20 …)` and `stroke-dasharray`; if the spark crowds the ring, move the path's x values. Re-render until it reads cleanly at 48 px too (`--fit-width 48`).
 
@@ -259,7 +259,7 @@ Expected: it reads as "O" + "A": the ring's gap sits at about 1–2 o'clock and 
 
 - [ ] **Step 4: Launcher icon layers**
 
-`PhoneAgent/design/oa-icon-background.svg`:
+`design/oa-icon-background.svg`:
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
@@ -271,7 +271,7 @@ Expected: it reads as "O" + "A": the ring's gap sits at about 1–2 o'clock and 
   <rect width="1024" height="1024" fill="url(#bg)"/>
 </svg>
 ```
-`PhoneAgent/design/oa-icon-foreground.svg` = the mark centred in the safe zone (mark spans ~56% of the canvas):
+`design/oa-icon-foreground.svg` = the mark centred in the safe zone (mark spans ~56% of the canvas):
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-48 -48 216 216">
   <defs>
@@ -1243,7 +1243,7 @@ export const GEMINI_THINKING_BUDGET: Record<string, number> = { 'none': 0, 'low'
 
 - [ ] **Step 7: Run** – `.\scripts\test.ps1` → 0 failures; Pass = previous + 6.
 
-- [ ] **Step 8: Live check (do it right after Task 7 lands; one call each, needs the user's keys; skip any provider without a key)** – set effort `max` for Claude Opus 5.5 in Settings (Task 7) and run "Turn on Wi-Fi"; `hilog` shows no 400. Same with GPT-5 `minimal` and Gemini 2.5 Flash `none` if keys exist. Record which were checked in `PhoneAgent/README.md` next to the provider list.
+- [ ] **Step 8: Live check (do it right after Task 7 lands; one call each, needs the user's keys; skip any provider without a key)** – set effort `max` for Claude Opus 5.5 in Settings (Task 7) and run "Turn on Wi-Fi"; `hilog` shows no 400. Same with GPT-5 `minimal` and Gemini 2.5 Flash `none` if keys exist. Record which were checked in `README.md` next to the provider list.
 
 - [ ] **Step 9: Checkpoint** – (only with user OK) commit "Let the user choose reasoning effort per model".
 
@@ -1254,7 +1254,7 @@ export const GEMINI_THINKING_BUDGET: Record<string, number> = { 'none': 0, 'low'
 - Create: `entry/src/main/resources/base/media/ic_back.svg`, `ic_settings.svg`
 - Modify: `entry/src/main/ets/common/Settings.ets` (orb flag)
 - Modify: `entry/src/main/resources/base/profile/main_pages.json`
-- Modify: `PhoneAgent/README.md` ("Use" section)
+- Modify: `README.md` ("Use" section)
 
 **Interfaces:**
 - Consumes: `PROVIDERS`, `ModelChoice`, `ProviderInfo`, `isValidModelId` (Providers); `loadSettings`, `loadApiKey`, `saveApiKey`, `saveSettings` (Settings); `AgentClient`, `StatusTracker`; `DISPLAY_FONT`.
@@ -2058,7 +2058,7 @@ Read every screenshot. Check against D3/D5 and the Global Constraints: gradient 
 **Files:**
 - Create: `entry/src/main/ets/overlay/OrbGeometry.ets`, `overlay/OverlayController.ets`, `overlay/OverlayService.ets`, `pages/OverlayOrb.ets`
 - Test: `entry/src/ohosTest/ets/test/OrbGeometry.test.ets` (+ `List.test.ets`)
-- Modify: `entry/src/main/module.json5`, `main_pages.json`, `signing/profile-template.json`, `entryability/EntryAbility.ets`, `PhoneAgent/ARCHITECTURE.md`
+- Modify: `entry/src/main/module.json5`, `main_pages.json`, `signing/profile-template.json`, `entryability/EntryAbility.ets`, `ARCHITECTURE.md`
 
 **Interfaces:**
 - Consumes: `StatusTracker`, `AgentClient`, `buildTimeline`, `subscribeEvents`, `EVT_STATUS`, `EVT_UI_VISIBLE`, `OWN_BUNDLE`, `SYSTEMUI_BUNDLE`, `loadShowOrb`, `OVERLAY_ABILITY`, `registerFonts`.
@@ -2428,7 +2428,7 @@ Run `.\scripts\test.ps1` → 0 failures.
 **Files:**
 - Modify: `entry/src/main/ets/overlay/OverlayController.ets`
 - Create: `entry/src/main/ets/pages/OverlaySheet.ets`, `pages/OverlayPill.ets`, `pages/OverlayGlow.ets`
-- Modify: `main_pages.json`, `PhoneAgent/README.md`
+- Modify: `main_pages.json`, `README.md`
 
 **Interfaces:**
 - Consumes: Task 9 controller, `Composer`, `StepList`, `OaMark`, `checkRun`, `currentStepText`, `modelSummary`, `findProvider`, `loadSettings`, `ORIGIN_OVERLAY`, `OWN_BUNDLE`.
@@ -2779,7 +2779,7 @@ If touches do not pass through the full-screen glow window on the emulator even 
 
 **Files (outside this repo, in a scratch clone):**
 - Modify: `applications_systemui/features/navigationservice/src/main/ets/com/ohos/navigationservice/KeyCodeEvent.ts`
-- Modify (this repo): `PhoneAgent/ARCHITECTURE.md`, `PhoneAgent/README.md`, `PhoneAgent/AI_WORKFLOW.md` (record the outcome either way)
+- Modify (this repo): `ARCHITECTURE.md`, `README.md`, `AI_WORKFLOW.md` (record the outcome either way)
 
 **Interfaces:**
 - Consumes: `OverlayService` accepting `invoke: true` from `com.ohos.systemui` (Task 9 Step 5).
@@ -2854,7 +2854,7 @@ Expected: `install bundle successfully`. If it fails with a signature or "system
   - `README.md`: if it works, a short "Optional: long-press Home" setup section with the exact build/sign/install commands used; otherwise one line saying the orb is the way to open the agent.
   - `AI_WORKFLOW.md`: one line on the research (SystemUI source reading, why apps cannot hook the soft Home key).
 
-- [ ] **Step 5: Checkpoint** – (only with user OK) commit "Document the long-press Home spike" (+ a `patches/systemui-longpress-home.patch` file made with `git -C $env:TEMP\oa-systemui diff > PhoneAgent/patches/systemui-longpress-home.patch` if it worked).
+- [ ] **Step 5: Checkpoint** – (only with user OK) commit "Document the long-press Home spike" (+ a `patches/systemui-longpress-home.patch` file made with `git -C $env:TEMP\oa-systemui diff > patches/systemui-longpress-home.patch` if it worked).
 
 ---
 

@@ -1,10 +1,10 @@
 # Handoff: Oniro Agent UI changes (planning only, nothing implemented)
 
-Repo: `C:\Users\user\PycharmProjects\hackyeah2026` (branch `main`, clean apart from the untracked plan below). App = `PhoneAgent/`, an ArkTS app for OpenHarmony/Oniro.
+Repo: `C:\Users\user\PycharmProjects\hackyeah2026` (branch `main`, clean apart from the untracked plan below). App = the repository root, an ArkTS app for OpenHarmony/Oniro.
 
 ## Status
 - **No app code was changed.** The only output is the plan file:
-  `PhoneAgent/docs/superpowers/plans/2026-10-03-oniro-agent-ui.md` (untracked, not committed).
+  `docs/superpowers/plans/2026-10-03-oniro-agent-ui.md` (untracked, not committed).
 - The user wants **planning only**. Don't implement, don't commit, don't edit app code until they explicitly say so. They got upset when they saw edits (those were edits to the plan file) and asked for "revert + handoff".
 - Open question for the user: keep the plan file in `docs/`, or move or delete it? (It's the main deliverable; it was not deleted.)
 
