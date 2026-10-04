@@ -1,0 +1,12 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#0F141C" },
+    { "name": "bg", "value": "#0F141C" },
+    { "name": "surface", "value": "#192029" },
+    { "name": "surface_raised", "value": "#222A35" },
+    { "name": "ink", "value": "#E9EDF3" },
+    { "name": "ink_muted", "value": "#96A0AF" },
+    { "name": "line", "value": "#2B3440" },
+    { "name": "danger", "value": "#FF8A7F" }
+  ]
+}

@@ -15,6 +15,7 @@ struct Index {
   @State duration: string = '60';
   @State notice: string = '';
   private calendar: calendarManager.Calendar | undefined = undefined;
+  private selectedEvent: calendarManager.Event | undefined = undefined;
 
   aboutToAppear(): void {
     this.initialize();
@@ -57,12 +58,22 @@ struct Index {
   }
 
   private newEvent(): void {
+    this.selectedEvent = undefined;
     this.title = '';
     this.day = dateText(new Date());
     this.time = '17:00';
     this.duration = '60';
     this.notice = '';
     this.editing = true;
+  }
+
+  private editEvent(event: calendarManager.Event): void {
+    this.selectedEvent = event;
+    this.title = event.title ?? '';
+    this.day = dateText(new Date(event.startTime));
+    this.time = timeText(new Date(event.startTime));
+    this.duration = `${Math.round((event.endTime - event.startTime) / 60000)}`;
+    this.notice = ''; this.editing = true;
   }
 
   private async save(): Promise<void> {
@@ -80,12 +91,17 @@ struct Index {
       if (!/^\d+$/.test(this.duration) || !Number.isInteger(minutes) || minutes < 1 || minutes > 10080) {
         throw new Error('Duration must be 1 to 10080 minutes.');
       }
-      const event: calendarManager.Event = {
+      const event: calendarManager.Event = this.selectedEvent ?? {
         type: calendarManager.EventType.NORMAL, title: title,
         startTime: start, endTime: start + minutes * 60000, isAllDay: false
       };
+      event.title = title; event.startTime = start; event.endTime = start + minutes * 60000;
       this.busy = true;
-      const id = await this.calendar.addEvent(event);
+      let id: number;
+      if (this.selectedEvent !== undefined && event.id !== undefined) {
+        await this.calendar.updateEvent(event);
+        id = event.id;
+      } else { id = await this.calendar.addEvent(event); }
       // Confirm the write by reading it back before displaying success.
       const saved = await this.calendar.getEvents(calendarManager.EventFilter.filterById([id]));
       if (saved.length === 0) {
@@ -120,7 +136,8 @@ struct Index {
   build() {
     Column({ space: 16 }) {
       Row() {
-        Text(this.editing ? 'New event' : 'Calendar').fontSize(28).fontWeight(FontWeight.Bold).layoutWeight(1)
+        Text(this.editing ? (this.selectedEvent === undefined ? 'New event' : 'Edit event') : 'Calendar')
+          .fontSize(28).fontWeight(FontWeight.Bold).layoutWeight(1)
         if (this.editing) {
           Button('Cancel').onClick(() => { this.editing = false; this.notice = ''; }).enabled(!this.busy)
         } else {
@@ -163,11 +180,13 @@ struct Index {
                 Text(event.title ?? 'Event').fontSize(21).fontWeight(FontWeight.Medium).width('100%')
                 Text(`${dateText(new Date(event.startTime))} ${timeText(new Date(event.startTime))} – ` +
                   `${dateText(new Date(event.endTime))} ${timeText(new Date(event.endTime))}`).fontSize(15).width('100%')
+                Button('Edit event').accessibilityText(`Edit event ${event.title ?? ''}`)
+                  .enabled(!this.busy).onClick(() => this.editEvent(event))
                 Button('Delete event').accessibilityText(`Delete event ${event.title ?? ''}`)
                   .enabled(!this.busy).onClick(() => this.remove(event))
               }.padding(16).borderRadius(16).backgroundColor('#FFFFFF').width('100%')
             }
-          }, (event: calendarManager.Event) => `${event.id}`)
+          }, (event: calendarManager.Event) => `${event.id}:${event.title}:${event.startTime}:${event.endTime}`)
         }.layoutWeight(1).width('100%')
       }
     }.padding(20).width('100%').height('100%').backgroundColor('#F6F5FB').alignItems(HorizontalAlign.Start)

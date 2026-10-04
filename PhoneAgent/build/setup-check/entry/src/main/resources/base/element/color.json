@@ -1,0 +1,16 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#F2F4F7" },
+    { "name": "bg", "value": "#F2F4F7" },
+    { "name": "surface", "value": "#FFFFFF" },
+    { "name": "surface_raised", "value": "#FFFFFF" },
+    { "name": "ink", "value": "#141B26" },
+    { "name": "ink_muted", "value": "#5E6878" },
+    { "name": "line", "value": "#DCE1E8" },
+    { "name": "danger", "value": "#C9372C" },
+    { "name": "orb_teal", "value": "#12B5A6" },
+    { "name": "orb_violet", "value": "#6E56F8" },
+    { "name": "orb_coral", "value": "#FF6B5A" },
+    { "name": "on_orb", "value": "#FFFFFF" }
+  ]
+}

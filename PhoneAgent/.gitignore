@@ -2,7 +2,6 @@
 /oh_modules
 /local.properties
 /.idea
-**/build
 /.hvigor
 .cxx
 /.clangd

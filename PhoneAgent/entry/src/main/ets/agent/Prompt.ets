@@ -15,6 +15,7 @@ Rules:
 - For dated reminders, open Reminders and save the title, date and time, then verify the scheduled reminder on screen. Use instructions in the notes when they specify when to buy a gift. A reminder is separate from the party's calendar event.
 - To address a person (message, call, share), pick them from the contact list rather than typing their name: typed names are usually not resolved to contacts. An unlabeled icon at the end of a recipient field usually opens the contact picker. Contact names may be informal ("Grandma", "Mom").
 - Do the whole task, including the final confirming tap (Send, Save, OK...), unless the user asked you not to.
+- For multi-part requests, complete every requested part before calling finish. After saving an event or reminder, continue with the remaining work.
 - You cannot ask the user anything during the task. If something is ambiguous, make the most sensible choice; if the task is impossible, stop.
 - When you write a message on the user's behalf, write it in the language the user used, in the first person, as the user would write it themselves (not as an instruction).
 - If an action did not change the screen as expected, try a different approach (another element, scrolling, going back) instead of repeating it more than twice.

@@ -96,14 +96,16 @@ With the emulator running:
 ```powershell
 .\scripts\build.ps1
 .\scripts\build-calendar.ps1
+.\scripts\build-notes.ps1
+.\scripts\build-reminders.ps1
 .\scripts\test.ps1
 ```
 
 The first build installs OHPM dependencies automatically, builds the agent and creates its signing material in `.signing`. Public OpenHarmony test certificates and the system-app profile template are included in `signing/`; you do not need a Huawei account or personal signing certificate for this Oniro image. Keep `.signing` for subsequent updates. A new checkout on another computer creates a different app certificate; installing over a copy signed elsewhere may require uninstalling that copy first, which deletes its local settings and skills. Builds using the same signing material can update in place.
 
-The scripts install and launch **Oniro Agent** and the separate **Calendar** app. Grant Calendar access when asked. Open Oniro Agent, then **Settings → AI provider → API key → model**. Enter your own provider key; keys are not included in the repository. The app enables its accessibility service and shows **Agent service on**. The test suite requires the emulator but does not call paid AI APIs; a successful run reports **Pass: 102**.
+The scripts install and launch **Oniro Agent**, **Calendar**, **Notes**, and **Reminders**. Grant Calendar access when asked. The Oniro image already includes Contacts and Messages; the Notes companion exposes note bodies to accessibility, and Reminders schedules actual system notifications. Open Oniro Agent, then **Settings → AI provider → API key → model**. Enter your own provider key; keys are not included in the repository. The app enables its accessibility service and shows **Agent service on**. The test suite requires the emulator but does not call paid AI APIs; a successful run reports **Pass: 102**.
 
-For build-only output, use `.\scripts\build.ps1 -NoInstall` and `.\scripts\build-calendar.ps1 -NoInstall`. Signed HAPs are written to `build\phoneagent-signed.hap` and `build\calendar-signed.hap`. These system-app signatures target the Oniro/OpenHarmony test image; commercial HarmonyOS phones require different signing and permissions.
+Each build script accepts `-NoInstall` for build-only output. Signed HAPs are written to `build\phoneagent-signed.hap`, `build\calendar-signed.hap`, `build\notes-signed.hap`, and `build\reminders-signed.hap`. These system-app signatures target the Oniro/OpenHarmony test image; commercial HarmonyOS phones require different signing and permissions.
 
 ### 5. Run from DevEco Studio (optional)
 
@@ -122,11 +124,25 @@ Leave **Open console for tool output** enabled. For a custom SDK location, prepa
 
 ## Use
 
-Settings (sliders icon, top right) → AI provider → API key → model (or "Custom model ID…"). Each provider keeps its own key. Back on the main screen type the task and tap the round button. To test the SMS task, add a contact "Babcia" first.
+Settings (sliders icon, top right) → AI provider → API key → model (or "Custom model ID…"). Each provider keeps its own key. Back on the main screen type the task and tap the round button. To test the SMS task, add a contact "Grandma" first.
 
 When you leave the app it shrinks into a floating orb (like a chat head; drag it to either edge); tap the orb to open the app again. While a task runs, a pill at the top shows the current step and the model's latest thought; its red button stops the task immediately, and tapping the pill shows all steps. Turn the orb off in Settings.
 
-Contacts on the test emulator: Babcia, Mama, Tata, Dziadek, Kuba (600100200–600100204), added by the agent itself.
+Contacts on the prepared test emulator: Grandma, Mom, Dad, Grandpa, Jacob (600100200–600100204). Their original numbers were preserved when the names were translated. A fresh Oniro image needs these demo contacts added separately.
+
+### Birthday presentation
+
+Follow [DEMO.md](DEMO.md) for the presentation and repeat-run cleanup. After building the four apps, refresh the prepared note:
+
+```powershell
+.\scripts\prepare-demo.ps1
+```
+
+This checks the installed bundles and explicitly seeds **Grandma birthday party** in the debug Notes app for tomorrow at **17:00–18:00**, with the gift reminder at **10:00**. Normal Notes launches do not seed data. Confirm Grandma exists in Contacts, then enter:
+
+> Check in notes what time grandma’s birthday party is, create an event in the calendar and set a reminder to buy a gift. Send SMS to the grandma that I will come
+
+The emulator has no SIM: the agent can select Grandma, compose the English SMS and press Send, but mobile-network delivery cannot be demonstrated on this image. It reports that limitation in its final summary.
 
 ### User skills
 
