@@ -8,11 +8,13 @@
 import { Context } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { PROVIDER_ANTHROPIC, PROVIDERS } from '../agent/Providers';
+import { parseSkills, serializeSkills, UserSkill } from '../agent/Skills';
 
 const STORE = 'settings';
 const KEY_PROVIDER = 'provider';
 const KEY_MODEL = 'model';
 const KEY_EFFORT = 'effort';
+const KEY_SKILLS = 'skills';
 const KEY_API_KEY_PREFIX = 'apiKey.';
 /** single key of versions that only supported Anthropic */
 const LEGACY_KEY_API_KEY = 'apiKey';
@@ -68,6 +70,17 @@ export async function saveSettings(ctx: Context, settings: AgentSettings): Promi
   prefs.putSync(KEY_MODEL, settings.model);
   prefs.putSync(KEY_EFFORT, settings.effort);
   prefs.putSync(KEY_API_KEY_PREFIX + settings.provider, settings.apiKey.trim());
+  await prefs.flush();
+}
+
+export function loadSkills(ctx: Context, dropCache: boolean = false): UserSkill[] {
+  const json = store(ctx, dropCache).getSync(KEY_SKILLS, '[]');
+  return typeof json === 'string' ? parseSkills(json as string) : [];
+}
+
+export async function saveSkills(ctx: Context, skills: UserSkill[]): Promise<void> {
+  const prefs = store(ctx, false);
+  prefs.putSync(KEY_SKILLS, serializeSkills(skills));
   await prefs.flush();
 }
 

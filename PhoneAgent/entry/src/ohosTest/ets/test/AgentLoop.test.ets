@@ -2,6 +2,7 @@ import { describe, expect, it } from '@ohos/hypium';
 import { ApiMessage, ContentBlock, MessagesResponse } from '../../../main/ets/agent/Anthropic';
 import { LlmError } from '../../../main/ets/agent/Http';
 import { AgentListener, AgentLoop, Executor, Llm, LOG_ERROR } from '../../../main/ets/agent/AgentLoop';
+import { UserSkill } from '../../../main/ets/agent/Skills';
 
 // ---------- fakes ----------
 
@@ -130,6 +131,48 @@ function setup(): [FakeLlm, FakeExecutor, RecordingListener, AgentLoop] {
 
 export default function agentLoopTest() {
   describe('AgentLoop', () => {
+    it('loads a skill body from the frozen snapshot without operating the device', 0, async () => {
+      const s = setup();
+      const skill: UserSkill = { id: '1', name: 'Calendar', description: 'Events', body: 'Use a 90-minute duration.', enabled: true };
+      const loop = new AgentLoop(s[0], s[1], s[2], 6, [skill]);
+      skill.body = 'Edited after starting';
+      skill.enabled = false;
+      s[0].responses = [reply('tool_use', [toolUse('r1', 'read_skill', { 'name': 'CALENDAR' })]), finish('f1')];
+      const result = await loop.run('Create an event');
+      expect(result.success).assertTrue();
+      expect(result.steps).assertEqual(2);
+      expect(s[1].actions.length).assertEqual(0);
+      expect(s[2].texts).assertContain('Read skill: Calendar');
+      const body = lastToolResults(s[0].requests[1])[0];
+      expect(body.content).assertEqual('Use a 90-minute duration.');
+      expect(body.is_error === true).assertFalse();
+      expect(s[0].requests[0].includes('90-minute')).assertFalse();
+    });
+
+    it('returns tool errors for disabled and missing skills without exposing their bodies', 0, async () => {
+      const s = setup();
+      const skill: UserSkill = { id: '1', name: 'Hidden', description: 'Events', body: 'Private instructions', enabled: false };
+      const loop = new AgentLoop(s[0], s[1], s[2], 6, [skill]);
+      s[0].responses = [reply('tool_use', [toolUse('r1', 'read_skill', { 'name': 'Hidden' })]), finish('f1')];
+      await loop.run('Task');
+      const result = lastToolResults(s[0].requests[1])[0];
+      expect(result.is_error).assertTrue();
+      expect(result.content).assertContain('No enabled skills');
+      expect(s[0].requests[1].includes('Private instructions')).assertFalse();
+      expect(s[1].actions.length).assertEqual(0);
+    });
+
+    it('counts reading skills against the normal step limit', 0, async () => {
+      const s = setup();
+      const skill: UserSkill = { id: '1', name: 'Calendar', description: 'Events', body: 'Instructions', enabled: true };
+      const loop = new AgentLoop(s[0], s[1], s[2], 1, [skill]);
+      s[0].responses = [reply('tool_use', [toolUse('r1', 'read_skill', { 'name': 'Calendar' })]), finish('f1')];
+      const result = await loop.run('Task');
+      expect(result.success).assertFalse();
+      expect(result.summary).assertContain('1 steps');
+      expect(s[0].requests.length).assertEqual(1);
+    });
+
     it('runs tool calls in order and finishes', 0, async () => {
       const s = setup();
       s[0].responses = [

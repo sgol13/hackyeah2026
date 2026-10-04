@@ -11,6 +11,7 @@ import { ApiMessage, ContentBlock, MessagesResponse } from './Anthropic';
 import { LlmError } from './Http';
 import { stepText } from './StepText';
 import { deviceTimeContext } from './DeviceTime';
+import { enabledSkills, findSkill, UserSkill } from './Skills';
 import {
   parseToolCall,
   TOOL_CLICK,
@@ -19,6 +20,7 @@ import {
   TOOL_LIST_APPS,
   TOOL_PRESS_KEY,
   TOOL_READ_SCREEN,
+  TOOL_READ_SKILL,
   TOOL_SCROLL,
   TOOL_SET_ALARM,
   TOOL_TYPE_TEXT,
@@ -120,17 +122,20 @@ export class AgentLoop {
   private exec: Executor;
   private listener: AgentListener;
   private maxSteps: number;
+  private skills: UserSkill[];
   private stopped: boolean = false;
   /** resolves when stop() is called, so a pending model call is abandoned right away */
   private stopSignal: Promise<undefined>;
   private signalStop: () => void = () => {
   };
 
-  constructor(llm: Llm, exec: Executor, listener: AgentListener, maxSteps: number = DEFAULT_MAX_STEPS) {
+  constructor(llm: Llm, exec: Executor, listener: AgentListener, maxSteps: number = DEFAULT_MAX_STEPS,
+    skills: UserSkill[] = []) {
     this.llm = llm;
     this.exec = exec;
     this.listener = listener;
     this.maxSteps = maxSteps;
+    this.skills = enabledSkills(skills);
     this.stopSignal = new Promise<undefined>((resolve) => {
       this.signalStop = () => resolve(undefined);
     });
@@ -209,7 +214,7 @@ export class AgentLoop {
           results.push(toolResult(id, 'Not executed: the task has ended.', true));
           continue;
         }
-        const parsed = parseToolCall(tu);
+        const parsed = parseToolCall(tu, this.skills);
         if (parsed.action === undefined) {
           const err = parsed.error ?? 'Invalid tool call';
           this.listener.log(LOG_ERROR, `Invalid tool call ${tu.name}: ${err}`);
@@ -259,6 +264,13 @@ export class AgentLoop {
 
   private async execute(a: ToolAction): Promise<string> {
     switch (a.name) {
+      case TOOL_READ_SKILL: {
+        const skill = findSkill(this.skills, a.text);
+        if (skill === undefined) {
+          throw new Error(`Unknown or disabled skill "${a.text}"`);
+        }
+        return skill.body;
+      }
       case TOOL_LIST_APPS:
         return await this.exec.listApps();
       case TOOL_LAUNCH_APP:

@@ -1,0 +1,25 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "mainElement": "EntryAbility",
+    "deviceTypes": ["default"],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "requestPermissions": [
+      { "name": "ohos.permission.PUBLISH_AGENT_REMINDER" },
+      { "name": "ohos.permission.NOTIFICATION_CONTROLLER" }
+    ],
+    "abilities": [{
+      "name": "EntryAbility",
+      "srcEntry": "./ets/entryability/EntryAbility.ets",
+      "icon": "$media:calendar_icon",
+      "label": "$string:app_name",
+      "startWindowIcon": "$media:calendar_icon",
+      "startWindowBackground": "$color:start_background",
+      "exported": true,
+      "skills": [{ "entities": ["entity.system.home"], "actions": ["ohos.want.action.home"] }]
+    }]
+  }
+}

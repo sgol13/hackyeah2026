@@ -1,4 +1,5 @@
 import agentLoopTest from './AgentLoop.test';
+import skillsTest from './Skills.test';
 import deviceTimeTest from './DeviceTime.test';
 import anthropicTest from './Anthropic.test';
 import geminiTest from './Gemini.test';
@@ -20,6 +21,7 @@ export default function testsuite() {
   geminiTest();
   providersTest();
   agentLoopTest();
+  skillsTest();
   deviceTimeTest();
   stepTextTest();
   statusTrackerTest();

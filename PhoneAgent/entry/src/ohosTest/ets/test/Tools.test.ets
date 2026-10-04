@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@ohos/hypium';
 import { ContentBlock } from '../../../main/ets/agent/Anthropic';
-import { parseToolCall, TOOLS } from '../../../main/ets/agent/Tools';
+import { parseToolCall, TOOLS, toolsForSkills } from '../../../main/ets/agent/Tools';
+import { UserSkill } from '../../../main/ets/agent/Skills';
 
 function call(name: string, input: Record<string, Object>): ContentBlock {
   return { type: 'tool_use', id: 'toolu_1', name: name, input: input };
@@ -8,6 +9,36 @@ function call(name: string, input: Record<string, Object>): ContentBlock {
 
 export default function toolsTest() {
   describe('Tools.parseToolCall', () => {
+    it('offers read_skill only for enabled skills with an exact name enum', 0, () => {
+      const active: UserSkill = { id: '1', name: 'Calendar', description: 'Events', body: 'Instructions', enabled: true };
+      const disabled: UserSkill = { id: '2', name: 'Hidden', description: 'Hidden', body: 'Secret', enabled: false };
+      expect(toolsForSkills([]).length).assertEqual(TOOLS.length);
+      expect(toolsForSkills([disabled]).length).assertEqual(TOOLS.length);
+      const tool = toolsForSkills([active, disabled]).find((t) => t.name === 'read_skill');
+      expect(tool?.input_schema.properties['name'].enum?.join(',')).assertEqual('Calendar');
+      expect(tool?.input_schema.additionalProperties).assertFalse();
+      expect(TOOLS.some((t) => t.name === 'read_skill')).assertFalse();
+    });
+
+    it('matches skill names case-insensitively and normalizes the action', 0, () => {
+      const active: UserSkill = { id: '1', name: 'Calendar', description: 'Events', body: 'Instructions', enabled: true };
+      const parsed = parseToolCall(call('read_skill', { 'name': 'calendar' }), [active]);
+      expect(parsed.action?.name).assertEqual('read_skill');
+      expect(parsed.action?.text).assertEqual('Calendar');
+      expect(parsed.error).assertUndefined();
+    });
+
+    it('rejects unknown, disabled, missing and invalid skill names', 0, () => {
+      const active: UserSkill = { id: '1', name: 'Calendar', description: 'Events', body: 'Instructions', enabled: true };
+      const disabled: UserSkill = { id: '2', name: 'Hidden', description: 'Hidden', body: 'Secret', enabled: false };
+      expect(parseToolCall(call('read_skill', { 'name': 'Calendar' })).error).assertContain('No enabled skills');
+      expect(parseToolCall(call('read_skill', { 'name': 'Hidden' }), [active, disabled]).error).assertContain('Unknown or disabled');
+      expect(parseToolCall(call('read_skill', { 'name': 'Missing' }), [active]).error).assertContain('Unknown or disabled');
+      expect(parseToolCall(call('read_skill', {}), [active]).error).assertContain('name');
+      expect(parseToolCall(call('read_skill', { 'name': 42 }), [active]).error).assertContain('name');
+      expect(parseToolCall(call('read_skill', { 'name': 'x'.repeat(61) }), [active]).error).assertContain('60');
+    });
+
     it('every tool has a strict object schema', 0, () => {
       for (const t of TOOLS) {
         expect(t.input_schema.type).assertEqual('object');

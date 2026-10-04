@@ -10,6 +10,12 @@ function action(name: string): ToolAction {
 
 export default function stepTextTest() {
   describe('StepText', () => {
+    it('names the skill being read in the timeline', 0, () => {
+      const read = action('read_skill');
+      read.text = 'Calendar';
+      expect(stepText(read, '', '')).assertEqual('Read skill: Calendar');
+    });
+
     it('targetFromLine prefers text, then desc, then hint, then the type', 0, () => {
       expect(targetFromLine('[6] TextArea "Hello" (click,edit)')).assertEqual('"Hello"');
       expect(targetFromLine('[2] Button desc="Send" (click)')).assertEqual('"Send"');

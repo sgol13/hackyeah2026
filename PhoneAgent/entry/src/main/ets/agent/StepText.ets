@@ -8,6 +8,7 @@ import {
   TOOL_LIST_APPS,
   TOOL_PRESS_KEY,
   TOOL_READ_SCREEN,
+  TOOL_READ_SKILL,
   TOOL_SCROLL,
   TOOL_SET_ALARM,
   TOOL_TYPE_TEXT,
@@ -48,6 +49,8 @@ export function stepText(a: ToolAction, appLabel: string, elementLine: string): 
       return `Open ${appLabel.length > 0 ? appLabel : a.bundleName}`;
     case TOOL_READ_SCREEN:
       return 'Look at the screen';
+    case TOOL_READ_SKILL:
+      return `Read skill: ${a.text}`;
     case TOOL_CLICK:
       return `Tap ${target}`;
     case TOOL_TYPE_TEXT:

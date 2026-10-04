@@ -4,6 +4,7 @@
  * with an error, which the agent loop returns as an is_error tool_result.
  */
 import { ContentBlock, JsonSchemaProperty, ToolDef } from './Anthropic';
+import { enabledSkills, findSkill, SKILL_NAME_LIMIT, UserSkill } from './Skills';
 
 export const TOOL_LIST_APPS = 'list_apps';
 export const TOOL_LAUNCH_APP = 'launch_app';
@@ -13,6 +14,7 @@ export const TOOL_TYPE_TEXT = 'type_text';
 export const TOOL_SCROLL = 'scroll';
 export const TOOL_PRESS_KEY = 'press_key';
 export const TOOL_SET_ALARM = 'set_alarm';
+export const TOOL_READ_SKILL = 'read_skill';
 export const TOOL_FINISH = 'finish';
 
 const MAX_LABEL_LEN = 100;
@@ -83,6 +85,18 @@ export const TOOLS: ToolDef[] = [
     }, ['success', 'summary'])
 ];
 
+/** Per-run tools. The skill reader is absent when there are no enabled skills. */
+export function toolsForSkills(skills: UserSkill[]): ToolDef[] {
+  const active = enabledSkills(skills);
+  const tools = TOOLS.slice();
+  if (active.length > 0) {
+    tools.push(tool(TOOL_READ_SKILL,
+      'Read the full instructions of a user skill. Load relevant skills before operating their apps or performing their tasks.',
+      { 'name': enumProp(active.map((skill: UserSkill) => skill.name), 'Name of an enabled skill from the Skills catalog') }, ['name']));
+  }
+  return tools;
+}
+
 /** A validated tool call. Only the fields relevant to `name` are meaningful. */
 export interface ToolAction {
   name: string;
@@ -142,7 +156,7 @@ function getIntIn(input: Record<string, Object>, key: string, min: number, max: 
 }
 
 /** Validates a tool_use block from the model. Never throws. */
-export function parseToolCall(block: ContentBlock): ParseResult {
+export function parseToolCall(block: ContentBlock, skills: UserSkill[] = []): ParseResult {
   const name = block.name ?? '';
   const input = block.input;
   if (input === undefined || input === null || typeof input !== 'object') {
@@ -150,6 +164,21 @@ export function parseToolCall(block: ContentBlock): ParseResult {
   }
   const action = newAction(name);
   switch (name) {
+    case TOOL_READ_SKILL: {
+      if (!skills.some((skill: UserSkill) => skill.enabled)) {
+        return fail('No enabled skills are available.');
+      }
+      const requested = getString(input, 'name', SKILL_NAME_LIMIT);
+      if (requested === undefined || requested.trim().length === 0) {
+        return fail(`"name" must be a skill name of at most ${SKILL_NAME_LIMIT} characters`);
+      }
+      const skill = findSkill(skills, requested);
+      if (skill === undefined) {
+        return fail(`Unknown or disabled skill "${requested}". Enabled skills: ${enabledSkills(skills).map((s: UserSkill) => s.name).join(', ')}`);
+      }
+      action.text = skill.name;
+      return { action: action };
+    }
     case TOOL_LIST_APPS:
     case TOOL_READ_SCREEN:
       return { action: action };
@@ -229,6 +258,6 @@ export function parseToolCall(block: ContentBlock): ParseResult {
       return { action: action };
     }
     default:
-      return fail(`Unknown tool "${name}". Available tools: ${TOOLS.map((t: ToolDef) => t.name).join(', ')}`);
+      return fail(`Unknown tool "${name}". Available tools: ${toolsForSkills(skills).map((t: ToolDef) => t.name).join(', ')}`);
   }
 }

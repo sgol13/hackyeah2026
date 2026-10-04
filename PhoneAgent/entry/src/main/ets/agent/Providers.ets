@@ -9,7 +9,7 @@
  * tools, so OpenAI models that only take tools through the Responses API
  * (GPT-6 Astra, GPT-6.1 Sol; GPT-6 Luna unless effort is "none") are not suggested.
  */
-import { AnthropicClient, ApiMessage, ChatClient, findModel, MessagesResponse, ModelOption } from './Anthropic';
+import { AnthropicClient, ApiMessage, ChatClient, findModel, MessagesResponse, ModelOption, ToolDef } from './Anthropic';
 import { Llm } from './AgentLoop';
 import { GeminiClient } from './Gemini';
 import { OPENAI_CHAT_URL, OpenAiCompatClient, XAI_CHAT_URL } from './OpenAiCompat';
@@ -118,27 +118,35 @@ export function modelSummary(providerId: string, modelId: string, effort: string
   return effort.length > 0 ? `${model}, ${effortLabel(effort).toLowerCase()} effort` : model;
 }
 
-class AnthropicLlm implements Llm {
+export class AnthropicLlm implements Llm {
   private client: AnthropicClient;
+  private system: string;
+  private tools: ToolDef[];
 
-  constructor(client: AnthropicClient) {
+  constructor(client: AnthropicClient, system: string = SYSTEM_PROMPT, tools: ToolDef[] = TOOLS) {
     this.client = client;
+    this.system = system;
+    this.tools = tools;
   }
 
   send(messages: ApiMessage[]): Promise<MessagesResponse> {
-    return this.client.createMessage(this.client.buildRequest(SYSTEM_PROMPT, TOOLS, messages));
+    return this.client.createMessage(this.client.buildRequest(this.system, this.tools, messages));
   }
 }
 
-class ChatClientLlm implements Llm {
+export class ChatClientLlm implements Llm {
   private client: ChatClient;
+  private system: string;
+  private tools: ToolDef[];
 
-  constructor(client: ChatClient) {
+  constructor(client: ChatClient, system: string = SYSTEM_PROMPT, tools: ToolDef[] = TOOLS) {
     this.client = client;
+    this.system = system;
+    this.tools = tools;
   }
 
   send(messages: ApiMessage[]): Promise<MessagesResponse> {
-    return this.client.createMessage(SYSTEM_PROMPT, TOOLS, messages);
+    return this.client.createMessage(this.system, this.tools, messages);
   }
 }
 
@@ -146,20 +154,21 @@ class ChatClientLlm implements Llm {
  * Creates the model client for a provider; throws on an unknown provider or invalid model ID.
  * An effort the model does not list is ignored, so stale settings never cause a 400.
  */
-export function createLlm(provider: string, apiKey: string, model: string, effort: string = ''): Llm {
+export function createLlm(provider: string, apiKey: string, model: string, effort: string = '',
+  system: string = SYSTEM_PROMPT, tools: ToolDef[] = TOOLS): Llm {
   if (!isValidModelId(model)) {
     throw new Error(`Invalid model ID "${model}"`);
   }
   const e = effortsFor(provider, model).indexOf(effort) >= 0 ? effort : '';
   switch (provider) {
     case PROVIDER_ANTHROPIC:
-      return new AnthropicLlm(new AnthropicClient(apiKey, anthropicModelOption(model, e)));
+      return new AnthropicLlm(new AnthropicClient(apiKey, anthropicModelOption(model, e)), system, tools);
     case PROVIDER_OPENAI:
-      return new ChatClientLlm(new OpenAiCompatClient(OPENAI_CHAT_URL, apiKey, model, e));
+      return new ChatClientLlm(new OpenAiCompatClient(OPENAI_CHAT_URL, apiKey, model, e), system, tools);
     case PROVIDER_XAI:
-      return new ChatClientLlm(new OpenAiCompatClient(XAI_CHAT_URL, apiKey, model, e));
+      return new ChatClientLlm(new OpenAiCompatClient(XAI_CHAT_URL, apiKey, model, e), system, tools);
     case PROVIDER_GEMINI:
-      return new ChatClientLlm(new GeminiClient(apiKey, model, e));
+      return new ChatClientLlm(new GeminiClient(apiKey, model, e), system, tools);
     default:
       throw new Error(`Unknown AI provider "${provider}"`);
   }

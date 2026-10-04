@@ -16,7 +16,7 @@ import { KEY_INCOMING_AUTORUN, KEY_INCOMING_TASK } from '../entryability/EntryAb
 
 const AUTORUN_DELAY_MS = 1500;
 const SUGGESTIONS: string[] = [
-  'Text Babcia that I will come to her birthday',
+  'Text Grandma that I will come to her birthday',
   'Turn on Wi-Fi',
   'Set an alarm for 7:00'
 ];
@@ -100,6 +100,10 @@ struct Index {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Settings' });
   }
 
+  private openSkills(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Skills' });
+  }
+
   private async run(): Promise<void> {
     const problem = checkRun(this.providerLabel(), this.settings.apiKey, this.settings.model, this.task);
     if (problem.length > 0) {
@@ -178,6 +182,11 @@ struct Index {
           .fontSize(20)
           .fontColor($r('app.color.ink'))
           .layoutWeight(1)
+        Image($r('app.media.ic_skills'))
+          .id('skills')
+          .width(24).height(24).fillColor($r('app.color.ink'))
+          .padding(10).width(44).height(44)
+          .accessibilityText('Skills').onClick(() => this.openSkills())
         Image($r('app.media.ic_settings'))
           .id('settings')
           .width(24)

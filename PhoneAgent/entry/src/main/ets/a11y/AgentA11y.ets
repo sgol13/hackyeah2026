@@ -9,6 +9,9 @@ import { commonEventManager } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AgentListener, AgentLoop, Llm, LOG_ERROR } from '../agent/AgentLoop';
 import { createLlm, findProvider } from '../agent/Providers';
+import { SYSTEM_PROMPT } from '../agent/Prompt';
+import { enabledSkills, skillPromptSection } from '../agent/Skills';
+import { toolsForSkills } from '../agent/Tools';
 import {
   AgentStatus,
   EVT_RUN,
@@ -23,7 +26,7 @@ import {
   subscribeEvents,
   unsubscribeEvents
 } from '../common/Bridge';
-import { loadApiKey } from '../common/Settings';
+import { loadApiKey, loadSkills } from '../common/Settings';
 import { DeviceExecutor } from './DeviceExecutor';
 import { SCRIPT_PREFIX, ScriptedLlm } from './ScriptedLlm';
 import BuildProfile from 'BuildProfile';
@@ -159,6 +162,7 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
       return;
     }
     const task = req.task.trim();
+    const skills = enabledSkills(loadSkills(this.context, true));
     let llm: Llm;
     if (BuildProfile.DEBUG && task.startsWith(SCRIPT_PREFIX)) {
       llm = new ScriptedLlm(task.substring(SCRIPT_PREFIX.length));
@@ -175,7 +179,7 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
       }
       try {
         llm = createLlm(provider.id, apiKey, typeof req.model === 'string' ? req.model.trim() : '',
-          typeof req.effort === 'string' ? req.effort : '');
+          typeof req.effort === 'string' ? req.effort : '', SYSTEM_PROMPT + skillPromptSection(skills), toolsForSkills(skills));
       } catch (e) {
         this.addLog(LOG_ERROR, (e as Error).message);
         return;
@@ -183,7 +187,7 @@ export default class AgentA11y extends AccessibilityExtensionAbility {
     }
     this.entries = [];
     this.running = true;
-    const loop = new AgentLoop(llm, new DeviceExecutor(this.context), new StatusPublisher(this));
+    const loop = new AgentLoop(llm, new DeviceExecutor(this.context), new StatusPublisher(this), undefined, skills);
     this.loop = loop;
     try {
       await loop.run(task);

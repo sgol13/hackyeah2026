@@ -1,0 +1,4 @@
+{ "string": [
+  { "name": "app_name", "value": "Notes" },
+  { "name": "calendar_reason", "value": "Create and display your calendar events" }
+] }

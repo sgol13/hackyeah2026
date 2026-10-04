@@ -30,3 +30,13 @@ Each task ends with `.\scripts\test.ps1` green.
 - Corrupt `skills` JSON does not crash the app (list is empty).
 - Renaming a skill to a different-case version of its own name is allowed; a duplicate name is rejected.
 - Back from the editor without Save discards changes; header icons fit at 360 px width.
+
+## Implementation verification — 2026-10-04
+
+All five tasks are implemented. `scripts/test.ps1` passed after each stage (92, 96, 98, 102 and 102 tests); the final editor counter/icon correction also passed all 102 tests.
+
+- Emulator: saved “Calendar formatting”, ran “List my calendar events.”, observed `Read skill: Calendar formatting`, and received the body-directed summary `Calendar checked: impreza (2026-10-05 17:00–18:00), imieniny babci (2026-10-05 20:00–21:00).`
+- Tests verify enabled-only prompt/tool disclosure, rejection of disabled/unknown skills, immutable run contents, step accounting, and corrupt JSON recovery using the app's real Preferences store.
+- Emulator: a case-only rename saved successfully; a second skill with the same name showed an inline error and could not be saved. Back discarded an unsaved description change. The disabled toggle persisted after leaving/reopening Skills. The saved skill survived an emulator restart. Delete required confirmation; Cancel preserved the skill. The temporary verification skill was then removed.
+- The main header fits the emulator's 360 px width. Editor character counters and validation errors update as fields change.
+- README setup was checked against the scripts. Both Agent and Calendar built and signed from an isolated source-only copy without local.properties, oh_modules, build output or existing signing files, using the installed DevEco/full SDK.

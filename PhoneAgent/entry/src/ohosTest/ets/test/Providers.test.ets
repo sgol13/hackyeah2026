@@ -1,6 +1,12 @@
 import { describe, expect, it } from '@ohos/hypium';
+import { AnthropicClient, ApiMessage, ChatClient, MessagesRequest, MessagesResponse, ToolDef } from '../../../main/ets/agent/Anthropic';
+import { SYSTEM_PROMPT } from '../../../main/ets/agent/Prompt';
+import { TOOLS, toolsForSkills } from '../../../main/ets/agent/Tools';
+import { UserSkill } from '../../../main/ets/agent/Skills';
 import {
   anthropicModelOption,
+  AnthropicLlm,
+  ChatClientLlm,
   createLlm,
   effortLabel,
   effortsFor,
@@ -15,8 +21,58 @@ import {
   PROVIDERS
 } from '../../../main/ets/agent/Providers';
 
+class RecordingChatClient implements ChatClient {
+  system: string = '';
+  tools: ToolDef[] = [];
+  createMessage(system: string, tools: ToolDef[], messages: ApiMessage[]): Promise<MessagesResponse> {
+    this.system = system;
+    this.tools = tools;
+    const response: MessagesResponse = { id: 'test', model: 'test', stop_reason: 'end_turn', content: [] };
+    return Promise.resolve(response);
+  }
+}
+
+class RecordingAnthropicClient extends AnthropicClient {
+  request: MessagesRequest | undefined = undefined;
+  constructor() {
+    super('test-key', anthropicModelOption('claude-haiku-4-5', ''));
+  }
+  createMessage(request: MessagesRequest): Promise<MessagesResponse> {
+    this.request = request;
+    const response: MessagesResponse = { id: 'test', model: 'test', stop_reason: 'end_turn', content: [] };
+    return Promise.resolve(response);
+  }
+}
+
 export default function providersTest() {
   describe('Providers', () => {
+    it('passes a custom system prompt and skill tools to both provider adapters', 0, async () => {
+      const skill: UserSkill = { id: '1', name: 'Calendar', description: 'Events', body: 'Instructions', enabled: true };
+      const tools = toolsForSkills([skill]);
+      const chat = new RecordingChatClient();
+      await new ChatClientLlm(chat, 'CUSTOM SYSTEM', tools).send([]);
+      expect(chat.system).assertEqual('CUSTOM SYSTEM');
+      expect(chat.tools.some((tool: ToolDef) => tool.name === 'read_skill')).assertTrue();
+      const anthropic = new RecordingAnthropicClient();
+      await new AnthropicLlm(anthropic, 'CUSTOM SYSTEM', tools).send([]);
+      expect(anthropic.request?.system).assertEqual('CUSTOM SYSTEM');
+      expect(anthropic.request?.tools.some((tool: ToolDef) => tool.name === 'read_skill')).assertTrue();
+      for (const provider of PROVIDERS) {
+        expect(createLlm(provider.id, 'key', provider.models[0].id, '', 'CUSTOM SYSTEM', tools) !== undefined).assertTrue();
+      }
+    });
+
+    it('keeps the original prompt and tools as the default', 0, async () => {
+      const chat = new RecordingChatClient();
+      await new ChatClientLlm(chat).send([]);
+      expect(chat.system).assertEqual(SYSTEM_PROMPT);
+      expect(chat.tools.length).assertEqual(TOOLS.length);
+      const anthropic = new RecordingAnthropicClient();
+      await new AnthropicLlm(anthropic).send([]);
+      expect(anthropic.request?.system).assertEqual(SYSTEM_PROMPT);
+      expect(anthropic.request?.tools.length).assertEqual(TOOLS.length);
+    });
+
     it('lists the four providers with suggested models', 0, () => {
       expect(PROVIDERS.length).assertEqual(4);
       for (const id of [PROVIDER_ANTHROPIC, PROVIDER_OPENAI, PROVIDER_XAI, PROVIDER_GEMINI]) {
