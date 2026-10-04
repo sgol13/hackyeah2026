@@ -10,6 +10,7 @@
 import { ApiMessage, ContentBlock, MessagesResponse } from './Anthropic';
 import { LlmError } from './Http';
 import { stepText } from './StepText';
+import { deviceTimeContext } from './DeviceTime';
 import {
   parseToolCall,
   TOOL_CLICK,
@@ -19,6 +20,7 @@ import {
   TOOL_PRESS_KEY,
   TOOL_READ_SCREEN,
   TOOL_SCROLL,
+  TOOL_SET_ALARM,
   TOOL_TYPE_TEXT,
   ToolAction
 } from './Tools';
@@ -37,6 +39,8 @@ export interface Executor {
   typeText(index: number, text: string): Promise<void>;
   scroll(index: number, down: boolean): Promise<void>;
   pressKey(key: string): Promise<void>;
+  /** Sets a one-time alarm with the system alarm service; returns a confirmation for the model. */
+  setAlarm(hour: number, minute: number, label: string): Promise<string>;
   /** Waits for the UI to settle after an action. */
   settle(): Promise<void>;
 }
@@ -117,16 +121,25 @@ export class AgentLoop {
   private listener: AgentListener;
   private maxSteps: number;
   private stopped: boolean = false;
+  /** resolves when stop() is called, so a pending model call is abandoned right away */
+  private stopSignal: Promise<undefined>;
+  private signalStop: () => void = () => {
+  };
 
   constructor(llm: Llm, exec: Executor, listener: AgentListener, maxSteps: number = DEFAULT_MAX_STEPS) {
     this.llm = llm;
     this.exec = exec;
     this.listener = listener;
     this.maxSteps = maxSteps;
+    this.stopSignal = new Promise<undefined>((resolve) => {
+      this.signalStop = () => resolve(undefined);
+    });
   }
 
+  /** Stops the task now: a model call in progress is abandoned and no further action is executed. */
   stop(): void {
     this.stopped = true;
+    this.signalStop();
   }
 
   private end(success: boolean, summary: string, steps: number): AgentResult {
@@ -143,7 +156,7 @@ export class AgentLoop {
       apps = '(could not list apps: ' + errorMessage(e as Object) + ')';
     }
     const messages: ApiMessage[] = [
-      { role: 'user', content: [textBlock(`Task: ${task}\n\nInstalled apps:\n${apps}`)] }
+      { role: 'user', content: [textBlock(`Task: ${task}\n\n${deviceTimeContext()}\n\nInstalled apps:\n${apps}`)] }
     ];
     let nudges = 0;
     for (let step = 1; step <= this.maxSteps; step++) {
@@ -152,8 +165,16 @@ export class AgentLoop {
       }
       let resp: MessagesResponse;
       try {
-        resp = await this.llm.send(messages);
+        const pending: Promise<MessagesResponse | undefined>[] = [this.llm.send(messages), this.stopSignal];
+        const answer: MessagesResponse | undefined = await Promise.race(pending);
+        if (answer === undefined || this.stopped) {
+          return this.end(false, 'Stopped by the user.', step - 1);
+        }
+        resp = answer;
       } catch (e) {
+        if (this.stopped) {
+          return this.end(false, 'Stopped by the user.', step - 1);
+        }
         const msg = e instanceof LlmError ? describeApiError(e as LlmError) : errorMessage(e as Object);
         return this.end(false, msg, step - 1);
       }
@@ -257,6 +278,8 @@ export class AgentLoop {
       case TOOL_PRESS_KEY:
         await this.exec.pressKey(a.key);
         return await this.afterAction(`Pressed ${a.key}. New screen:`);
+      case TOOL_SET_ALARM:
+        return await this.exec.setAlarm(a.hour, a.minute, a.text);
       default:
         throw new Error(`Unsupported tool ${a.name}`);
     }

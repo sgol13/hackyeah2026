@@ -9,8 +9,9 @@ import { http } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 const MAX_RETRIES = 3;
-const CONNECT_TIMEOUT_MS = 30000;
-const READ_TIMEOUT_MS = 180000;
+const CONNECT_TIMEOUT_MS = 15000;
+// A step normally answers within ~20 s; a stalled connection is retried instead of blocking the task for minutes.
+const READ_TIMEOUT_MS = 90000;
 
 export class LlmError extends Error {
   status: number;

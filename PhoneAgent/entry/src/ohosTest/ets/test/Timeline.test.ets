@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@ohos/hypium';
 import { LogEntry } from '../../../main/ets/common/Bridge';
-import { buildTimeline, currentStepText, STEP_THINKING } from '../../../main/ets/common/Timeline';
+import { buildTimeline, currentStepText, currentThoughtText, STEP_THINKING } from '../../../main/ets/common/Timeline';
 
 function e(seq: number, kind: string, text: string): LogEntry {
   return { seq: seq, kind: kind, text: text };
@@ -33,6 +33,16 @@ export default function timelineTest() {
       expect(text.indexOf('\n')).assertEqual(-1);
       expect(text.length <= 120).assertTrue();
       expect(currentStepText([])).assertEqual('');
+    });
+
+    it('currentThoughtText is the latest thought, on one line', 0, () => {
+      const steps = buildTimeline([
+        e(1, 'task', 't'), e(2, 'thought', 'First\nidea.'), e(3, 'action', 'Open Messages'),
+        e(4, 'thought', 'Now pick Babcia.'), e(5, 'action', 'Tap "Babcia"'), e(6, 'action', 'Tap "Send"')
+      ]);
+      expect(currentThoughtText(steps)).assertEqual('Now pick Babcia.');
+      expect(currentThoughtText(buildTimeline([e(1, 'task', 't'), e(2, 'thought', 'a\nb')]))).assertEqual('a b');
+      expect(currentThoughtText([])).assertEqual('');
     });
   });
 }

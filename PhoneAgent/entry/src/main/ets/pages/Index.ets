@@ -119,6 +119,8 @@ struct Index {
     if (msg.length > 0) {
       this.running = false;
       this.notice = msg;
+    } else {
+      this.task = '';
     }
   }
 

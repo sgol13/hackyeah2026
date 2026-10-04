@@ -12,7 +12,10 @@ export const TOOL_CLICK = 'click';
 export const TOOL_TYPE_TEXT = 'type_text';
 export const TOOL_SCROLL = 'scroll';
 export const TOOL_PRESS_KEY = 'press_key';
+export const TOOL_SET_ALARM = 'set_alarm';
 export const TOOL_FINISH = 'finish';
+
+const MAX_LABEL_LEN = 100;
 
 const MAX_TEXT_LEN = 2000;
 const MAX_INDEX = 10000;
@@ -64,6 +67,14 @@ export const TOOLS: ToolDef[] = [
   tool(TOOL_PRESS_KEY,
     'Press a system key: "back" goes back or closes the keyboard, "home" goes to the home screen. Returns the new screen.',
     { 'key': enumProp(['back', 'home'], 'Which key to press') }, ['key']),
+  tool(TOOL_SET_ALARM,
+    'Set an alarm with the phone\'s system alarm service (no app needed): at the given time the phone rings and shows a notification. ' +
+      'Use it for any alarm or wake-up request. The alarm rings once, at the next occurrence of that time.',
+    {
+      'hour': prop('integer', 'Hour, 0-23 (24-hour clock)'),
+      'minute': prop('integer', 'Minute, 0-59'),
+      'label': prop('string', 'Optional short name for the alarm, in the user\'s language')
+    }, ['hour', 'minute']),
   tool(TOOL_FINISH,
     'Call once when the task is complete, or when it cannot be completed. This ends the task.',
     {
@@ -81,6 +92,9 @@ export interface ToolAction {
   scrollDown: boolean;
   key: string;
   success: boolean;
+  /** set_alarm only */
+  hour: number;
+  minute: number;
 }
 
 export interface ParseResult {
@@ -114,7 +128,17 @@ function getString(input: Record<string, Object>, key: string, maxLen: number): 
 }
 
 function newAction(name: string): ToolAction {
-  return { name: name, index: -1, text: '', bundleName: '', scrollDown: true, key: '', success: false };
+  return {
+    name: name, index: -1, text: '', bundleName: '', scrollDown: true, key: '', success: false, hour: -1, minute: -1
+  };
+}
+
+function getIntIn(input: Record<string, Object>, key: string, min: number, max: number): number | undefined {
+  const v = input[key];
+  if (typeof v !== 'number' || !Number.isInteger(v as number) || (v as number) < min || (v as number) > max) {
+    return undefined;
+  }
+  return v as number;
 }
 
 /** Validates a tool_use block from the model. Never throws. */
@@ -177,6 +201,21 @@ export function parseToolCall(block: ContentBlock): ParseResult {
         return fail('"key" must be "back" or "home"');
       }
       action.key = key;
+      return { action: action };
+    }
+    case TOOL_SET_ALARM: {
+      const hour = getIntIn(input, 'hour', 0, 23);
+      const minute = getIntIn(input, 'minute', 0, 59);
+      if (hour === undefined || minute === undefined) {
+        return fail('"hour" must be an integer 0-23 and "minute" an integer 0-59');
+      }
+      const label = input['label'] === undefined ? '' : getString(input, 'label', MAX_LABEL_LEN);
+      if (label === undefined) {
+        return fail(`"label" must be a string of at most ${MAX_LABEL_LEN} characters`);
+      }
+      action.hour = hour;
+      action.minute = minute;
+      action.text = label;
       return { action: action };
     }
     case TOOL_FINISH: {

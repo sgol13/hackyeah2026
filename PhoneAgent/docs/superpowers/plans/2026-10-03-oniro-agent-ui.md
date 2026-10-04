@@ -41,6 +41,8 @@ Effort per model (checked 2026-10-03; re-check the OpenAI/xAI/Gemini docs with C
 
 Re-checked 2026-10-04 (Task 6b Step 2) against the providers' docs: the suggested models moved on (GPT-5/5 mini, Grok 4/3 mini and Gemini 2.5 are no longer the listed models), Gemini 3+ takes `thinkingLevel` (a `thinkingLevel` on 2.5 models is an error), and OpenAI's GPT-6 Astra / 6.1 Sol only support function calling through the Responses API, so they are not suggested for the Chat Completions client.
 
+**Changed after review (2026-10-04, by the user):** D6/D7 simplified. Long-press Home (Stage 4) is dropped; the app minimizes to the orb (chat-head style) and tapping the orb opens the app. The bottom sheet is removed. While a task runs the pill shows instead of the orb (current step, latest thought, a Stop button that ends the task immediately). Alarms use a `set_alarm` tool (system reminder service) because the image's Clock app has no alarms.
+
 ## Global Constraints
 
 - Display name: exactly `Oniro Agent`. Bundle name stays `com.hackyeah.phoneagent` (`AppScope/app.json5`), `OWN_BUNDLE`/event names in `common/Bridge.ets` unchanged.

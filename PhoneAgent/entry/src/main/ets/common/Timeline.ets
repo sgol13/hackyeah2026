@@ -29,11 +29,23 @@ export function buildTimeline(entries: LogEntry[]): Step[] {
   return steps;
 }
 
+function oneLine(text: string): string {
+  const line = text.replace(/\s+/g, ' ').trim();
+  return line.length > MAX_LINE ? line.substring(0, MAX_LINE - 1) + '…' : line;
+}
+
 /** The newest step as one short line, for the pill. */
 export function currentStepText(steps: Step[]): string {
-  if (steps.length === 0) {
-    return '';
+  return steps.length === 0 ? '' : oneLine(steps[steps.length - 1].text);
+}
+
+/** The model's latest thought (of the newest step that has one) as one short line, for the pill. */
+export function currentThoughtText(steps: Step[]): string {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const t = steps[i].thoughts;
+    if (t.length > 0) {
+      return oneLine(t[t.length - 1]);
+    }
   }
-  const line = steps[steps.length - 1].text.replace(/\s+/g, ' ').trim();
-  return line.length > MAX_LINE ? line.substring(0, MAX_LINE - 1) + '…' : line;
+  return '';
 }

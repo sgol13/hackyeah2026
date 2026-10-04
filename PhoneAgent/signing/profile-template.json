@@ -21,7 +21,8 @@
             "ohos.permission.WRITE_ACCESSIBILITY_CONFIG",
             "ohos.permission.GET_BUNDLE_INFO_PRIVILEGED",
             "ohos.permission.START_ABILITIES_FROM_BACKGROUND",
-            "ohos.permission.SYSTEM_FLOAT_WINDOW"
+            "ohos.permission.SYSTEM_FLOAT_WINDOW",
+            "ohos.permission.NOTIFICATION_CONTROLLER"
         ]
     },
     "app-privilege-capabilities": [

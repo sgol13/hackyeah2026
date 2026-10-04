@@ -23,8 +23,6 @@ export const EVT_UI_VISIBLE = 'com.hackyeah.phoneagent.UI_VISIBLE';
 
 export const ORIGIN_APP = 'app';
 export const ORIGIN_OVERLAY = 'overlay';
-/** the stock navigation bar; the only other app allowed to open the overlay (long-press Home) */
-export const SYSTEMUI_BUNDLE = 'com.ohos.systemui';
 
 export interface RunRequest {
   task: string;

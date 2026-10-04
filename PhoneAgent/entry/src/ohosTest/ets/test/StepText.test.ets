@@ -3,7 +3,9 @@ import { stepText, targetFromLine } from '../../../main/ets/agent/StepText';
 import { ToolAction } from '../../../main/ets/agent/Tools';
 
 function action(name: string): ToolAction {
-  return { name: name, index: -1, text: '', bundleName: '', scrollDown: true, key: '', success: true };
+  return {
+    name: name, index: -1, text: '', bundleName: '', scrollDown: true, key: '', success: true, hour: -1, minute: -1
+  };
 }
 
 export default function stepTextTest() {
@@ -44,6 +46,10 @@ export default function stepTextTest() {
       const key = action('press_key');
       key.key = 'home';
       expect(stepText(key, '', '')).assertEqual('Press Home');
+      const alarm = action('set_alarm');
+      alarm.hour = 7;
+      alarm.minute = 5;
+      expect(stepText(alarm, '', '')).assertEqual('Set an alarm for 07:05');
     });
   });
 }

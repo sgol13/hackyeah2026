@@ -10,9 +10,6 @@ export struct Composer {
   };
   onStop: () => void = () => {
   };
-  /** the input gained (true) or lost (false) focus; the overlay sheet uses it to stay above the keyboard */
-  onFocusChange: (focused: boolean) => void = () => {
-  };
 
   private active(): boolean {
     return this.running || (this.canRun && this.text.trim().length > 0);
@@ -32,8 +29,6 @@ export struct Composer {
         .onChange((v: string) => {
           this.text = v;
         })
-        .onFocus(() => this.onFocusChange(true))
-        .onBlur(() => this.onFocusChange(false))
       Column() {
         Image(this.running ? $r('app.media.ic_stop') : $r('app.media.ic_arrow_up'))
           .width(22)

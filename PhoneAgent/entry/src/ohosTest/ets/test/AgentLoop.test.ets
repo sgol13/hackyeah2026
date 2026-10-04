@@ -6,6 +6,15 @@ import { AgentListener, AgentLoop, Executor, Llm, LOG_ERROR } from '../../../mai
 // ---------- fakes ----------
 
 /** Replays scripted responses and records every request it receives. */
+/** A model call that takes 10 s, to test stopping while waiting for the model. */
+class SlowLlm implements Llm {
+  send(messages: ApiMessage[]): Promise<MessagesResponse> {
+    return new Promise<MessagesResponse>((resolve) => {
+      setTimeout(() => resolve({ id: 'm', model: 'x', stop_reason: 'end_turn', content: [] }), 10000);
+    });
+  }
+}
+
 class FakeLlm implements Llm {
   responses: MessagesResponse[] = [];
   error: LlmError | undefined = undefined;
@@ -74,6 +83,11 @@ class FakeExecutor implements Executor {
 
   settle(): Promise<void> {
     return Promise.resolve();
+  }
+
+  setAlarm(hour: number, minute: number, label: string): Promise<string> {
+    this.actions.push(`alarm ${hour}:${minute} ${label}`);
+    return Promise.resolve(`Alarm set for ${hour}:${minute}.`);
   }
 }
 
@@ -224,6 +238,31 @@ export default function agentLoopTest() {
       ];
       await s[3].run('text grandma');
       expect(s[2].texts).assertContain('Open Messages');
+    });
+
+    it('sets an alarm through the executor without reading the screen', 0, async () => {
+      const s = setup();
+      s[0].responses = [
+        reply('tool_use', [toolUse('t1', 'set_alarm', { 'hour': 19, 'minute': 0 })]),
+        finish('t2')
+      ];
+      const result = await s[3].run('Ustaw alarm na 19:00');
+      expect(result.success).assertTrue();
+      expect(s[1].actions.join('|')).assertEqual('alarm 19:0 ');
+      expect(s[2].texts).assertContain('Set an alarm for 19:00');
+      expect(lastToolResults(s[0].requests[1])[0].content).assertContain('Alarm set');
+    });
+
+    it('stops immediately while waiting for the model', 0, async () => {
+      const listener = new RecordingListener();
+      const loop = new AgentLoop(new SlowLlm(), new FakeExecutor(), listener, 6);
+      const started = Date.now();
+      setTimeout(() => loop.stop(), 100);
+      const result = await loop.run('task');
+      expect(result.success).assertFalse();
+      expect(result.summary).assertEqual('Stopped by the user.');
+      expect(Date.now() - started < 2000).assertTrue();
+      expect(listener.kinds[listener.kinds.length - 1]).assertEqual(LOG_ERROR);
     });
 
     it('can be stopped by the user', 0, async () => {

@@ -33,6 +33,17 @@ export default function toolsTest() {
       expect(fin.action?.text).assertEqual('Sent.');
     });
 
+    it('accepts set_alarm with a valid time and rejects others', 0, () => {
+      const ok = parseToolCall(call('set_alarm', { 'hour': 19, 'minute': 0, 'label': 'Alarm' }));
+      expect(ok.action?.hour).assertEqual(19);
+      expect(ok.action?.minute).assertEqual(0);
+      expect(ok.action?.text).assertEqual('Alarm');
+      expect(parseToolCall(call('set_alarm', { 'hour': 7, 'minute': 30 })).action?.text).assertEqual('');
+      expect(parseToolCall(call('set_alarm', { 'hour': 24, 'minute': 0 })).error).assertContain('hour');
+      expect(parseToolCall(call('set_alarm', { 'hour': 19, 'minute': 60 })).error).assertContain('minute');
+      expect(parseToolCall(call('set_alarm', { 'hour': '19', 'minute': 0 })).error).assertContain('hour');
+    });
+
     it('rejects unknown tools and lists the valid ones', 0, () => {
       const r = parseToolCall(call('tap_everything', {}));
       expect(r.action).assertUndefined();

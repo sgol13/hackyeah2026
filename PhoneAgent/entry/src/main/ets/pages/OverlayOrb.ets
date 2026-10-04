@@ -22,7 +22,7 @@ struct OverlayOrb {
     .opacity(this.idle ? 0.55 : 1)
     .accessibilityText('Open Oniro Agent')
     .gesture(GestureGroup(GestureMode.Exclusive,
-      TapGesture().onAction(() => OverlayController.get().openSheet()),
+      TapGesture().onAction(() => OverlayController.get().openApp()),
       PanGesture({ distance: 4 })
         .onActionStart((e: GestureEvent) => {
           OverlayController.get().orbDragStart(e.fingerList[0].displayX, e.fingerList[0].displayY);

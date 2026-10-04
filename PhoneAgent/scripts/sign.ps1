@@ -24,12 +24,15 @@ param(
     [string]$Java,
     # Only create key, certificate, profile and the IDE signing config (no hap needed).
     [switch]$PrepareOnly,
-    [string]$DevEco = 'C:\Program Files\Huawei\DevEco Studio'
+    [string]$DevEco = 'C:\Program Files\Huawei\DevEco Studio',
+    # Optional companion project; certificates/templates still come from PhoneAgent.
+    [string]$ProjectRoot
 )
 if (-not $PrepareOnly -and -not $InHap) { throw 'pass -InHap <unsigned.hap> or -PrepareOnly' }
 $ErrorActionPreference = 'Stop'
 
-$root = Split-Path -Parent $PSScriptRoot
+$resourcesRoot = Split-Path -Parent $PSScriptRoot
+$root = if ($ProjectRoot) { (Resolve-Path -LiteralPath $ProjectRoot).Path } else { $resourcesRoot }
 $work = Join-Path $root '.signing'
 New-Item -ItemType Directory -Force $work | Out-Null
 
@@ -79,8 +82,8 @@ if (-not (Test-Path $chain)) {
         '-issuer', 'C=CN,O=OpenHarmony,OU=OpenHarmony Team,CN= OpenHarmony Application CA',
         '-issuerKeyAlias', 'openharmony application ca',
         '-subject', 'C=CN,O=OpenHarmony,OU=OpenHarmony Team,CN=OpenHarmony Application Release',
-        '-keystoreFile', $ks, '-subCaCertFile', (Join-Path $root 'signing\subCA.cer'),
-        '-rootCaCertFile', (Join-Path $root 'signing\rootCA.cer'), '-outForm', 'certChain',
+        '-keystoreFile', $ks, '-subCaCertFile', (Join-Path $resourcesRoot 'signing\subCA.cer'),
+        '-rootCaCertFile', (Join-Path $resourcesRoot 'signing\rootCA.cer'), '-outForm', 'certChain',
         '-outFile', $chain, '-keyPwd', $ksPass, '-keystorePwd', $ksPass, '-issuerKeyPwd', $ksPass, '-validity', '3650')
 }
 
@@ -91,7 +94,7 @@ $appJson = Get-Content (Join-Path $root 'AppScope\app.json5') -Raw
 $bundle = [regex]::Match($appJson, '"bundleName"\s*:\s*"([^"]+)"').Groups[1].Value
 if (-not $bundle) { throw 'bundleName not found in AppScope/app.json5' }
 
-$profile = Get-Content (Join-Path $root 'signing\profile-template.json') -Raw | ConvertFrom-Json
+$profile = Get-Content (Join-Path $resourcesRoot 'signing\profile-template.json') -Raw | ConvertFrom-Json
 $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $profile.validity.'not-before' = $now - 86400
 $profile.validity.'not-after' = $now + 10 * 365 * 86400

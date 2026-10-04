@@ -1,27 +1,20 @@
 /**
- * The assistant overlay: floating orb, task sheet, status pill and edge glow, each its own TYPE_FLOAT window.
+ * The assistant overlay, each part its own TYPE_FLOAT window:
+ *  - orb: the app "minimized", like a chat head. Shown while the app is in the background and no
+ *    task runs; tap it to open the app again.
+ *  - pill: while a task runs, at the top: the current step and the model's latest thought; tap it for
+ *    all steps, Stop and Open app. Shown instead of the orb, with the edge glow.
  * Lives in the OverlayService process; the pages read its state from AppStorage and call it back.
- * Windows that only show status are not focusable, so the app being operated stays the active window
- * that the agent reads (getRootInActiveWindow).
+ * The pill and glow are not focusable, so the app being operated stays the active window that the
+ * agent reads (getRootInActiveWindow).
  */
 import { common } from '@kit.AbilityKit';
 import { display, window } from '@kit.ArkUI';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { findProvider, modelSummary } from '../agent/Providers';
 import { AgentClient } from '../common/AgentClient';
-import {
-  EVT_STATUS,
-  EVT_UI_VISIBLE,
-  ORIGIN_OVERLAY,
-  OWN_BUNDLE,
-  RunRequest,
-  subscribeEvents,
-  unsubscribeEvents
-} from '../common/Bridge';
+import { EVT_STATUS, EVT_UI_VISIBLE, OWN_BUNDLE, subscribeEvents, unsubscribeEvents } from '../common/Bridge';
 import { registerFonts } from '../common/Fonts';
-import { checkRun } from '../common/RunCheck';
-import { loadSettings } from '../common/Settings';
 import { StatusTracker } from '../common/StatusTracker';
 import { buildTimeline, Step } from '../common/Timeline';
 import { snapOrb } from './OrbGeometry';
@@ -32,19 +25,15 @@ const TAG = 'Overlay';
 export const KEY_OV_IDLE = 'ov.idle';
 export const KEY_OV_STEPS = 'ov.steps';
 export const KEY_OV_RUNNING = 'ov.running';
-export const KEY_OV_NOTICE = 'ov.notice';
-export const KEY_OV_BUSY = 'ov.busy';
 export const KEY_OV_EXPANDED = 'ov.expanded';
-export const KEY_OV_MODEL = 'ov.model';
 
 const ORB_VP = 64;
 const MARGIN_VP = 8;
 const TOP_INSET_VP = 40;
 const BOTTOM_INSET_VP = 56;
 const IDLE_MS = 3000;
-const SHEET_H_VP = 300;
 const PILL_W_VP = 360;
-const PILL_H_VP = 64;
+const PILL_H_VP = 76;
 const PILL_EXPANDED_H_VP = 440;
 const RESULT_MS = 4000;
 
@@ -56,7 +45,6 @@ export class OverlayController {
   private static instance: OverlayController | undefined = undefined;
   private ctx: common.ServiceExtensionContext | undefined = undefined;
   private orb: window.Window | undefined = undefined;
-  private sheet: window.Window | undefined = undefined;
   private pill: window.Window | undefined = undefined;
   private glow: window.Window | undefined = undefined;
   private tracker: StatusTracker = new StatusTracker();
@@ -75,9 +63,7 @@ export class OverlayController {
   private dragOrbX: number = 0;
   private dragOrbY: number = 0;
   private idleTimer: number = -1;
-  private sheetY: number = 0;
   private resultTimer: number = -1;
-  private ready: Promise<void> = Promise.resolve();
 
   static get(): OverlayController {
     if (OverlayController.instance === undefined) {
@@ -94,11 +80,6 @@ export class OverlayController {
     if (this.ctx !== undefined) {
       return;
     }
-    this.ready = this.doStart(ctx, showOrb, appVisible);
-    await this.ready;
-  }
-
-  private async doStart(ctx: common.ServiceExtensionContext, showOrb: boolean, appVisible: boolean): Promise<void> {
     this.ctx = ctx;
     this.showOrb = showOrb;
     this.appVisible = appVisible;
@@ -114,21 +95,11 @@ export class OverlayController {
     await this.updateOrb();
   }
 
-  /**
-   * Floating windows get no keyboardHeightChange (nor IME panel events) on the emulator, so while the
-   * sheet's input has focus the sheet moves out of the keyboard's area (the lower 45% of the screen).
-   */
-  liftSheet(up: boolean): void {
-    const y = up ? Math.max(this.px(TOP_INSET_VP), Math.round(this.screenH * 0.55) - this.px(SHEET_H_VP)) : this.sheetY;
-    this.sheet?.moveWindowTo(0, y);
-  }
-
   shutdown(): void {
     for (const s of this.subs) {
       unsubscribeEvents(s);
     }
     this.subs = [];
-    this.closeSheet();
     this.hidePill();
     this.orb?.destroyWindow();
     this.orb = undefined;
@@ -149,9 +120,9 @@ export class OverlayController {
     return win;
   }
 
-  /** Orb visible when: the switch is on, our app is not in front, and no sheet or pill is showing. */
+  /** The orb is the minimized app: switch on, app in the background, and no task running (the pill shows then). */
   protected orbWanted(): boolean {
-    return this.showOrb && !this.appVisible && this.sheet === undefined && this.pill === undefined;
+    return this.showOrb && !this.appVisible && this.pill === undefined && !this.tracker.running;
   }
 
   async updateOrb(): Promise<void> {
@@ -175,7 +146,12 @@ export class OverlayController {
   private onAppVisible(visible: boolean): void {
     this.appVisible = visible;
     if (visible) {
-      this.hidePill(); // the app shows the log itself
+      this.hidePill(); // the app shows the steps itself
+    } else if (this.tracker.running) {
+      // the agent just switched to the app it operates: show the pill right away, never the orb
+      this.showPill().catch((e: Error) => {
+        logError('pill', e);
+      });
     }
     this.updateOrb().catch((e: Error) => {
       logError('orb', e);
@@ -188,7 +164,7 @@ export class OverlayController {
     }
     AppStorage.setOrCreate<Step[]>(KEY_OV_STEPS, buildTimeline(this.tracker.entries));
     AppStorage.setOrCreate<boolean>(KEY_OV_RUNNING, this.tracker.running);
-    if (this.tracker.running && this.sheet === undefined && !this.appVisible) {
+    if (this.tracker.running && !this.appVisible) {
       this.showPill().catch((e: Error) => {
         logError('pill', e);
       });
@@ -237,71 +213,6 @@ export class OverlayController {
     this.wake();
   }
 
-  openSheet(): void {
-    this.ready.then(() => this.doOpenSheet())
-      .catch((e: Error) => {
-        logError('sheet', e);
-      });
-  }
-
-  private async doOpenSheet(): Promise<void> {
-    if (this.tracker.running) {
-      await this.showPill();
-      this.togglePill();
-      return;
-    }
-    if (this.sheet !== undefined || this.ctx === undefined) {
-      return;
-    }
-    const s = loadSettings(this.ctx, true);
-    AppStorage.setOrCreate<string>(KEY_OV_MODEL, modelSummary(s.provider, s.model, s.effort));
-    AppStorage.setOrCreate<string>(KEY_OV_NOTICE, '');
-    AppStorage.setOrCreate<boolean>(KEY_OV_BUSY, false);
-    const h = this.px(SHEET_H_VP);
-    this.sheetY = this.screenH - h;
-    this.sheet = await this.createWindow('oa.sheet', 'pages/OverlaySheet', this.screenW, h, 0, this.sheetY, true);
-    this.sheet.on('touchOutside', () => this.closeSheet());
-    this.sheet.on('keyboardHeightChange', (kh: number) => {
-      this.sheet?.moveWindowTo(0, this.sheetY - kh);
-    });
-    await this.sheet.showWindow();
-    await this.updateOrb();
-  }
-
-  closeSheet(): void {
-    const s = this.sheet;
-    this.sheet = undefined;
-    s?.destroyWindow();
-    this.updateOrb().catch(() => {
-    });
-  }
-
-  async run(task: string): Promise<void> {
-    if (this.ctx === undefined) {
-      return;
-    }
-    const s = loadSettings(this.ctx, true);
-    const p = findProvider(s.provider);
-    const problem = checkRun(p === undefined ? s.provider : p.label, s.apiKey, s.model, task);
-    if (problem.length > 0) {
-      AppStorage.setOrCreate<string>(KEY_OV_NOTICE, problem);
-      return;
-    }
-    AppStorage.setOrCreate<string>(KEY_OV_NOTICE, '');
-    AppStorage.setOrCreate<boolean>(KEY_OV_BUSY, true);
-    const req: RunRequest = {
-      task: task.trim(), provider: s.provider, model: s.model, effort: s.effort, origin: ORIGIN_OVERLAY
-    };
-    const msg = await this.client.run(req);
-    AppStorage.setOrCreate<boolean>(KEY_OV_BUSY, false);
-    if (msg.length > 0) {
-      AppStorage.setOrCreate<string>(KEY_OV_NOTICE, msg); // the sheet stays open (Review Focus 4)
-      return;
-    }
-    this.closeSheet();
-    await this.showPill();
-  }
-
   stop(): void {
     this.client.stop();
   }
@@ -311,8 +222,9 @@ export class OverlayController {
       const w = Math.min(this.screenW - this.px(32), this.px(PILL_W_VP));
       this.pill = await this.createWindow('oa.pill', 'pages/OverlayPill', w, this.px(PILL_H_VP),
         Math.round((this.screenW - w) / 2), this.px(TOP_INSET_VP), false);
+      AppStorage.setOrCreate<boolean>(KEY_OV_EXPANDED, false);
     }
-    AppStorage.setOrCreate<boolean>(KEY_OV_EXPANDED, false);
+    clearTimeout(this.resultTimer);
     await this.pill.showWindow();
     await this.showGlow();
     await this.updateOrb();
@@ -343,6 +255,7 @@ export class OverlayController {
     }
   }
 
+  /** Opens the app again (tap on the orb, or "Open app" in the pill). */
   openApp(): void {
     this.hidePill();
     this.ctx?.startAbility({ bundleName: OWN_BUNDLE, abilityName: 'EntryAbility' });

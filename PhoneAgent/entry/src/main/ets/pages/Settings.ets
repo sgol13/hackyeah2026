@@ -249,10 +249,10 @@ struct Settings {
           this.sectionTitle('Floating button')
           Row() {
             Column({ space: 2 }) {
-              Text('Show Oniro Agent over other apps')
+              Text('Minimize to a floating orb')
                 .fontSize(16)
                 .fontColor($r('app.color.ink'))
-              Text('Tap the orb in any app to give the agent a task.')
+              Text('When you leave the app it shrinks into an orb; tap it to come back.')
                 .fontSize(13)
                 .fontColor($r('app.color.ink_muted'))
             }

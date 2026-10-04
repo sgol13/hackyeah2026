@@ -9,9 +9,14 @@ import {
   TOOL_PRESS_KEY,
   TOOL_READ_SCREEN,
   TOOL_SCROLL,
+  TOOL_SET_ALARM,
   TOOL_TYPE_TEXT,
   ToolAction
 } from './Tools';
+
+function twoDigits(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
 
 const LINE = /^\[\d+\] (\S+)(?: "(.*?)")?(?: desc="(.*?)")?(?: hint="(.*?)")?(?: \(|$| @)/;
 
@@ -51,6 +56,8 @@ export function stepText(a: ToolAction, appLabel: string, elementLine: string): 
       return `Scroll ${a.scrollDown ? 'down' : 'up'}`;
     case TOOL_PRESS_KEY:
       return `Press ${capitalize(a.key)}`;
+    case TOOL_SET_ALARM:
+      return `Set an alarm for ${twoDigits(a.hour)}:${twoDigits(a.minute)}`;
     default:
       return a.name;
   }

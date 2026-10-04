@@ -55,13 +55,35 @@ Prebuilt `.hap` in GitHub Releases: `hdc install phoneagent-signed.hap`. If an o
 
 Settings (sliders icon, top right) → AI provider → API key → model (or "Custom model ID…"). Each provider keeps its own key. Back on the main screen type the task and tap the round button. To test the SMS task, add a contact "Babcia" first.
 
-Outside the app, tap the floating Oniro Agent orb (drag it to either edge) to give a task without leaving the app you are in. Progress shows in a pill at the top; tap it for the steps, Stop, or to open the app. Turn the orb off in Settings.
+When you leave the app it shrinks into a floating orb (like a chat head; drag it to either edge); tap the orb to open the app again. While a task runs, a pill at the top shows the current step and the model's latest thought; its red button stops the task immediately, and tapping the pill shows all steps. Turn the orb off in Settings.
 
-Long-press Home does not open the agent yet: the stock navigation bar has no long-press handler (see ARCHITECTURE.md); the orb is the way to open it from other apps.
+Contacts on the test emulator: Babcia, Mama, Tata, Dziadek, Kuba (600100200–600100204), added by the agent itself.
+
+### Calendar tasks
+
+The Oniro v6.1 image includes the hidden `com.ohos.calendardata` data service, but no usable Calendar UI. Build and install the separate Calendar companion app:
+
+```powershell
+.\scripts\build-calendar.ps1
+```
+
+Allow calendar access when it first opens. It appears as **Calendar** in the launcher (`com.hackyeah.calendar`) and stores events in the system calendar service. Then rebuild Oniro Agent with `.\scripts\build.ps1` and enter:
+
+> utworz wydarzenie w kalendarzu o nazwie impreza jutro o 17
+
+The agent opens Calendar, fills the event form and saves **impreza** for tomorrow at **17:00**, with a one-hour duration by default. Relative dates use the phone's local date and timezone. Events remain saved after closing the app. The Calendar source is in `calendar/`; it is a small companion app, separate from OpenHarmony's upstream Calendar app.
+
+Verified on the Oniro emulator on 2026-10-04 with this exact Polish prompt: the agent saved **impreza**, **2026-10-05 17:00–18:00**, and the event remained after restarting Calendar.
+
+Calendar date validation checks (using DevEco's bundled Node and the full SDK):
+
+```powershell
+& 'C:\Program Files\Huawei\DevEco Studio\tools\node\node.exe' .\calendar\test-time.cjs
+```
 
 ## Check
 
-- Tests: `.\scripts\test.ps1` → `Pass: 77`
+- Tests: `.\scripts\test.ps1` → `Pass: 83`
 - Screenshot: `.\scripts\screenshot.ps1 -Name main` → `build\shots\main.jpeg`
 - System app: `hdc shell "bm dump -n com.hackyeah.phoneagent" | findstr appPrivilegeLevel` → `system_core`
 - Log: `hdc shell "hilog -x" | findstr AgentA11y`

@@ -108,13 +108,21 @@ if (-not (Get-Emulator)) {
         exit $LASTEXITCODE
     }
 
-    # The window variant (...w.exe) has no console. Plain Start-Process detaches it: it keeps running
-    # after this script ends and doesn't hold its output open (DevEco's External Tool finishes).
+    # The window variant (...w.exe) has no console. It is started through WMI, so it is not a child of
+    # this script: closing or re-running DevEco's External Tool (or any shell) can't take it down with
+    # its process tree, and nothing waits on its output.
     $qemuW = $qemuExe -replace '\.exe$', 'w.exe'
     $argLine = ($qemuArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
     Write-Host "Starting Oniro emulator ($Images)..."
     Remove-Item $serialLog -ErrorAction SilentlyContinue
-    $proc = Start-Process -FilePath $qemuW -ArgumentList $argLine -WorkingDirectory $Images -PassThru
+    $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine = "`"$qemuW`" $argLine"; CurrentDirectory = $Images
+    }
+    if ($created.ReturnValue -ne 0) {
+        Write-Host "Could not start QEMU (Win32_Process.Create returned $($created.ReturnValue))."
+        exit 1
+    }
+    $proc = Get-Process -Id $created.ProcessId -ErrorAction SilentlyContinue
 } else {
     Write-Host 'Emulator process already started, waiting for boot...'
     $proc = $null

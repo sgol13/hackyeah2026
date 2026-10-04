@@ -1,4 +1,4 @@
-# Phone Agent (HackYeah 2026, Huawei challenge)
+# Oniro Agent (HackYeah 2026, Huawei challenge)
 
 An AI agent for OpenHarmony / Oniro: you type a task, it does it in the phone's apps.
 

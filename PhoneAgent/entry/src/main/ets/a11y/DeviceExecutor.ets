@@ -1,6 +1,8 @@
 import { AccessibilityAction, AccessibilityElement, AccessibilityExtensionContext } from '@kit.AccessibilityKit';
 import { bundleManager, launcherBundleManager, Want } from '@kit.AbilityKit';
 import { process } from '@kit.ArkTS';
+import { reminderAgentManager } from '@kit.BackgroundTasksKit';
+import { notificationManager } from '@kit.NotificationKit';
 import { Executor } from '../agent/AgentLoop';
 import { serializeScreen, SerializedScreen } from '../agent/ScreenText';
 import { OWN_BUNDLE } from '../common/Bridge';
@@ -144,5 +146,40 @@ export class DeviceExecutor implements Executor {
 
   async settle(): Promise<void> {
     await sleep(SETTLE_MS);
+  }
+
+  /**
+   * One-time alarm through the system reminder service (the stock Clock app on Oniro has no alarms).
+   * Reminders ring through our notifications, so they are switched on first (system API,
+   * NOTIFICATION_CONTROLLER).
+   */
+  async setAlarm(hour: number, minute: number, label: string): Promise<string> {
+    try {
+      const bundle: notificationManager.BundleOption = { bundle: OWN_BUNDLE };
+      if (!(await notificationManager.isNotificationEnabled(bundle))) {
+        await notificationManager.setNotificationEnable(bundle, true);
+      }
+    } catch (e) {
+      // publishReminder reports it if notifications are still off
+    }
+    const time = `${hour < 10 ? '0' : ''}${hour}:${minute < 10 ? '0' : ''}${minute}`;
+    const alarm: reminderAgentManager.ReminderRequestAlarm = {
+      reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
+      hour: hour,
+      minute: minute,
+      daysOfWeek: [],
+      title: label.length > 0 ? label : 'Alarm',
+      content: time,
+      ringDuration: 60,
+      snoozeTimes: 2,
+      timeInterval: 5 * 60,
+      actionButton: [
+        { title: 'Close', type: reminderAgentManager.ActionButtonType.ACTION_BUTTON_TYPE_CLOSE },
+        { title: 'Snooze', type: reminderAgentManager.ActionButtonType.ACTION_BUTTON_TYPE_SNOOZE }
+      ]
+    };
+    const id = await reminderAgentManager.publishReminder(alarm);
+    return `Alarm set for ${time} in the system alarm service (reminder id ${id}). ` +
+      'It rings once at the next occurrence of that time and shows a notification.';
   }
 }

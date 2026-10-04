@@ -3,7 +3,6 @@
     "pages/Index",
     "pages/Settings",
     "pages/OverlayOrb",
-    "pages/OverlaySheet",
     "pages/OverlayPill",
     "pages/OverlayGlow"
   ]

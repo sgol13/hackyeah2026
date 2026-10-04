@@ -1,4 +1,5 @@
 import agentLoopTest from './AgentLoop.test';
+import deviceTimeTest from './DeviceTime.test';
 import anthropicTest from './Anthropic.test';
 import geminiTest from './Gemini.test';
 import openAiCompatTest from './OpenAiCompat.test';
@@ -19,6 +20,7 @@ export default function testsuite() {
   geminiTest();
   providersTest();
   agentLoopTest();
+  deviceTimeTest();
   stepTextTest();
   statusTrackerTest();
   timelineTest();

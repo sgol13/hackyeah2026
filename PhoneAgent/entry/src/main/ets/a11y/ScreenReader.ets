@@ -97,6 +97,13 @@ export async function scrollElement(el: AccessibilityElement, forward: boolean):
 }
 
 export async function setElementText(el: AccessibilityElement, text: string): Promise<void> {
+  // ArkUI inserts SET_TEXT at the cursor. Select the existing contents first so
+  // type_text replaces prefilled dates/times instead of concatenating them.
+  const existing = el.text ?? '';
+  if (existing.length > 0) {
+    const selection: Parameter = { selectTextBegin: '0', selectTextEnd: `${existing.length}` };
+    await el.executeAction(AccessibilityAction.SET_SELECTION, selection);
+  }
   const param: Parameter = { setText: text };
   await el.executeAction(AccessibilityAction.SET_TEXT, param);
 }

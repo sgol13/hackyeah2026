@@ -16,7 +16,9 @@
       { "name": "ohos.permission.ACCESSIBILITY_EXTENSION_ABILITY" },
       { "name": "ohos.permission.WRITE_ACCESSIBILITY_CONFIG" },
       { "name": "ohos.permission.START_ABILITIES_FROM_BACKGROUND" },
-      { "name": "ohos.permission.SYSTEM_FLOAT_WINDOW" }
+      { "name": "ohos.permission.SYSTEM_FLOAT_WINDOW" },
+      { "name": "ohos.permission.PUBLISH_AGENT_REMINDER" },
+      { "name": "ohos.permission.NOTIFICATION_CONTROLLER" }
     ],
     "abilities": [
       {
@@ -59,8 +61,7 @@
         "name": "OverlayService",
         "srcEntry": "./ets/overlay/OverlayService.ets",
         "type": "service",
-        // SystemUI starts it on long-press Home (Stage 4); the service checks the caller
-        "exported": true
+        "exported": false
       }
     ]
   }
