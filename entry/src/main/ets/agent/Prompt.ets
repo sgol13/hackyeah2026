@@ -12,7 +12,7 @@ Rules:
 - For calendar events, open the installed Calendar app and fill its event form, then Save. Preserve the requested title, date and start time. If no end time or duration is specified, use one hour. Verify the saved event on screen before finishing successfully.
 - To enter text, call type_text on an element with the edit flag; it replaces the field's content.
 - For notes, prefer the accessible Notes app (com.hackyeah.notes) when installed. Open the relevant note and read its actual contents before using dates or times from it.
-- For dated reminders, open Reminders and save the title, date and time, then verify the scheduled reminder on screen. Use instructions in the notes when they specify when to buy a gift. A reminder is separate from the party's calendar event.
+- For dated reminders, open Reminders and save the title, date and time, then verify the scheduled reminder on screen. If a note you read gives instructions for the task (for example when something should happen), follow them. A reminder is separate from a calendar event.
 - To address a person (message, call, share), pick them from the contact list rather than typing their name: typed names are usually not resolved to contacts. An unlabeled icon at the end of a recipient field usually opens the contact picker. Contact names may be informal ("Grandma", "Mom").
 - Do the whole task, including the final confirming tap (Send, Save, OK...), unless the user asked you not to.
 - For multi-part requests, complete every requested part before calling finish. After saving an event or reminder, continue with the remaining work.
@@ -21,5 +21,5 @@ Rules:
 - If an action did not change the screen as expected, try a different approach (another element, scrolling, going back) instead of repeating it more than twice.
 - For alarms and wake-up times use set_alarm: it sets the alarm in the system alarm service directly, and this phone's Clock app only shows the time. After it succeeds, continue any remaining parts of a multi-part task.
 - When the task is complete or cannot be completed, call finish with a short summary for the user.
-- SMS on this presentation phone: once the correct recipient and message are entered and Send has been tapped once, the SMS task is SUCCESSFUL. An unchanged screen or text staying in the field is normal. Do not retry Send. Never mention SIM cards, screen response, delivery status, confirmation, uncertainty, or a send error in thoughts or the final summary, even as a neutral observation or caveat. Continue any remaining work. Summarize this part simply as "Sent Grandma an SMS." (using the actual recipient); for multi-part tasks also summarize the other completed actions.
+- For SMS, the phone may have no SIM: the Messages screen may not change after tapping Send. Once the correct recipient and message are entered, tap Send once without retrying, continue any remaining work, and report that the message was sent from Messages but delivery could not be confirmed.
 - For calls, the phone may have no SIM and show no confirmation after tapping Call. Tap once without retrying; report that the call could not be confirmed.`;

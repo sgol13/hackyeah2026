@@ -1,5 +1,13 @@
 # Oniro Agent
 
+<p align="center">
+  <a href="https://www.youtube.com/shorts/yb8SysyHY5I">
+    <img src="docs/demo.gif" width="300" alt="Oniro Agent demo on the Oniro 6.1 emulator: one sentence, the agent reads Notes, creates a Calendar event and a reminder, and texts Grandma">
+  </a>
+  <br>
+  <sub>Real run on the Oniro 6.1 emulator, sped up 2.5×. <a href="https://www.youtube.com/shorts/yb8SysyHY5I"><b>▶ Watch the full demo with sound on YouTube</b></a></sub>
+</p>
+
 HackYeah 2026, Huawei challenge. You type "text grandma that I'll come to her birthday" and an AI model does it on the phone: opens Messages, picks the contact, types, sends. Works with any app through accessibility. Only possible on OpenHarmony / Oniro (system app).
 
 AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gemini (implemented and unit-tested; live endpoints checked only with an invalid key, no real keys). Model and reasoning effort are chosen in Settings; effort levels per model follow the providers' docs as of 2026-10-04 and were not checked live.
@@ -8,7 +16,7 @@ AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gem
 - [AI_WORKFLOW.md](AI_WORKFLOW.md)
 - Ready-to-install package: [`build/phoneagent-release-signed.hap`](build/phoneagent-release-signed.hap) (see [Install the prebuilt .hap](#install-the-prebuilt-hap))
 
-[oniro-agent.mp4](oniro-agent.mp4)
+
 
 ## At a glance
 
@@ -41,8 +49,8 @@ AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gem
   | Limits | 25 model calls per task; screen ≤ 150 elements, texts ≤ 80 chars |
   | Stop | immediate, even during a pending model call |
   | Agent service not responding | pinged before each task, restarted if silent (8 s ping, 5 s ack) |
-- **Tests:** 81 on-device hypium tests: tool validation, malformed / refused / truncated responses, API errors of all 4 providers, agent loop with a scripted model, screen serializer.
-- **Hygiene:** no secrets in the repo (keys stored in app-private storage, signing material generated locally and git-ignored). 6 permissions, each one used. 0 runtime dependencies, no vendor SDKs.
+- **Tests:** 106 on-device hypium tests (`scripts/test.ps1` → `Pass: 106`): tool validation, malformed / refused / truncated responses, API errors of all 4 providers, agent loop with a scripted model, screen serializer.
+- **Hygiene:** no secrets in the repo (keys stored in app-private storage, signing material generated locally and git-ignored). 8 permissions, each one used (INTERNET for the model API, 4 for accessibility / app listing / background start, SYSTEM_FLOAT_WINDOW for the orb, 2 for `set_alarm` reminders). 0 runtime dependencies, no vendor SDKs.
 
 ### Platform capabilities
 | OpenHarmony API | Used for |
