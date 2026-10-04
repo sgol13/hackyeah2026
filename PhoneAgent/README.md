@@ -7,6 +7,7 @@ AI providers: Anthropic Claude (tested end to end), OpenAI, xAI Grok, Google Gem
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [AI_WORKFLOW.md](AI_WORKFLOW.md)
 - Demo video: _(link on submission)_
+- Ready-to-install package: [`build/phoneagent-release-signed.hap`](build/phoneagent-release-signed.hap) (see [Install the prebuilt .hap](#install-the-prebuilt-hap))
 
 ## At a glance
 
@@ -66,6 +67,17 @@ Does not run unchanged on any other OS.
 ## Versions
 
 Windows 11 · QEMU 11.1.0 for Windows (WHPX) · Oniro emulator v6.1 · DevEco Studio 6.1.1.280 · OpenHarmony full SDK 6.0.0.48 (API 20)
+
+## Install the prebuilt .hap
+
+The signed release package of Oniro Agent is in the repository: **[`build/phoneagent-release-signed.hap`](build/phoneagent-release-signed.hap)**. It is signed as a system app with the public OpenHarmony test certificates, so it installs on the Oniro v6.1 emulator (or another stock OpenHarmony test image) without building anything. Start the emulator ([step 3](#3-prepare-and-start-the-oniro-emulator)), then from this directory:
+
+```powershell
+hdc install build\phoneagent-release-signed.hap
+hdc shell aa start -a EntryAbility -b com.hackyeah.phoneagent
+```
+
+If another copy of Oniro Agent is installed (signed on a different computer), run `hdc uninstall com.hackyeah.phoneagent` first. The companion apps used in the demo are prebuilt next to it: `build\calendar-signed.hap`, `build\notes-signed.hap` and `build\reminders-signed.hap` (install them the same way). Then continue with [Use](#use).
 
 ## Setup
 
